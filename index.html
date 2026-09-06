@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Control de Etapas · Ciclismo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header no-print">
+    <h1>🚴 Control de Etapas</h1>
+    <p class="subtitle">Registro diario de corredores y clasificación general</p>
+  </header>
+
+  <!-- Configuración del evento -->
+  <section class="card no-print" id="config-evento">
+    <h2>Configuración del evento</h2>
+    <div class="grid">
+      <label>
+        Nombre del evento
+        <input type="text" id="ev-nombre" placeholder="Ej: Vuelta a Costa Rica 2026" />
+      </label>
+      <label>
+        Organiza
+        <input type="text" id="ev-organiza" placeholder="Federación Costarricense de Ciclismo" />
+      </label>
+      <label>
+        Comisario
+        <input type="text" id="ev-comisario" placeholder="Nombre del comisario" />
+      </label>
+      <label>
+        Tipo de clasificación
+        <select id="ev-tipo">
+          <option value="tiempo">Por tiempo (menor tiempo gana)</option>
+          <option value="puntos">Por puntos (mayor puntaje gana)</option>
+        </select>
+      </label>
+    </div>
+    <div id="puntos-config" class="hidden">
+      <label class="inline">
+        Esquema de puntos por posición (separado por comas, de 1° en adelante)
+        <input type="text" id="ev-esquema-puntos" placeholder="Ej: 25,20,16,13,11,10,9,8,7,6,5,4,3,2,1" />
+      </label>
+    </div>
+  </section>
+
+  <!-- Pestañas -->
+  <nav class="tabs no-print">
+    <button class="tab-btn active" data-tab="corredores">Corredores</button>
+    <button class="tab-btn" data-tab="etapas">Etapas</button>
+    <button class="tab-btn" data-tab="general">Clasificación general</button>
+    <button class="tab-btn" data-tab="respaldo">Respaldo</button>
+  </nav>
+
+  <!-- TAB: Corredores -->
+  <section class="tab-panel" id="tab-corredores">
+    <div class="card no-print">
+      <h2>Agregar corredor</h2>
+      <div class="grid">
+        <label>Dorsal <input type="number" id="c-dorsal" min="1" /></label>
+        <label>Nombre <input type="text" id="c-nombre" /></label>
+        <label>Categoría <input type="text" id="c-categoria" list="cats" placeholder="Elite, Máster, Sub-23..." /></label>
+        <label>Equipo <input type="text" id="c-equipo" /></label>
+      </div>
+      <datalist id="cats"></datalist>
+      <button class="btn primary" id="btn-add-corredor">Agregar corredor</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head no-print">
+        <h2>Corredores inscritos (<span id="count-corredores">0</span>)</h2>
+        <input type="search" id="buscar-corredor" placeholder="Buscar..." class="search" />
+      </div>
+      <div class="table-wrap">
+        <table id="tabla-corredores">
+          <thead>
+            <tr>
+              <th data-sort="dorsal">Dorsal</th>
+              <th data-sort="nombre">Nombre</th>
+              <th data-sort="categoria">Categoría</th>
+              <th data-sort="equipo">Equipo</th>
+              <th class="no-print">Acciones</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: Etapas -->
+  <section class="tab-panel hidden" id="tab-etapas">
+    <div class="card no-print">
+      <div class="etapa-toolbar">
+        <label>
+          Etapa
+          <select id="sel-etapa"></select>
+        </label>
+        <button class="btn" id="btn-nueva-etapa">+ Nueva etapa</button>
+        <button class="btn" id="btn-editar-etapa">✏️ Editar</button>
+        <button class="btn danger" id="btn-eliminar-etapa">🗑️ Eliminar etapa</button>
+      </div>
+    </div>
+
+    <div class="card" id="etapa-vacia-msg">
+      <p class="empty">No hay etapas creadas. Presiona <strong>+ Nueva etapa</strong> para empezar.</p>
+    </div>
+
+    <div class="card hidden" id="etapa-detalle">
+      <div class="etapa-encabezado">
+        <h2 id="etapa-titulo">Etapa</h2>
+        <p id="etapa-info" class="muted"></p>
+      </div>
+      <div class="table-wrap">
+        <table id="tabla-etapa">
+          <thead>
+            <tr>
+              <th>Pos.</th>
+              <th>Dorsal</th>
+              <th>Nombre</th>
+              <th>Categoría</th>
+              <th>Equipo</th>
+              <th id="th-resultado">Tiempo / Puntos</th>
+              <th>Estado</th>
+              <th class="no-print"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn no-print" id="btn-imprimir-etapa">🖨️ Imprimir / PDF etapa</button>
+    </div>
+  </section>
+
+  <!-- TAB: General -->
+  <section class="tab-panel hidden" id="tab-general">
+    <div class="card no-print">
+      <label class="inline">
+        Filtrar por categoría
+        <select id="filtro-categoria"><option value="">Todas</option></select>
+      </label>
+    </div>
+    <div class="card">
+      <div class="etapa-encabezado">
+        <h2>Clasificación general</h2>
+        <p id="general-info" class="muted"></p>
+      </div>
+      <div class="table-wrap">
+        <table id="tabla-general">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn no-print" id="btn-imprimir-general">🖨️ Imprimir / PDF general</button>
+    </div>
+  </section>
+
+  <!-- TAB: Respaldo -->
+  <section class="tab-panel hidden" id="tab-respaldo">
+    <div class="card no-print">
+      <h2>Respaldo de datos</h2>
+      <p class="muted">Los datos se guardan en este dispositivo. Usa el respaldo para pasarlos entre computadora y celular.</p>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-exportar">📤 Exportar respaldo (.json)</button>
+        <button class="btn" id="btn-importar">📥 Importar respaldo</button>
+        <input type="file" id="file-importar" accept="application/json" hidden />
+      </div>
+      <hr />
+      <button class="btn danger" id="btn-borrar-todo">🗑️ Borrar todos los datos</button>
+    </div>
+  </section>
+
+  <!-- Encabezado solo para impresión -->
+  <div id="print-header" class="print-only"></div>
+
+  <footer class="app-footer no-print">
+    <span id="save-status">Guardado automático activo</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
