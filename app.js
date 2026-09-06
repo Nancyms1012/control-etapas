@@ -219,26 +219,56 @@ function etapaActual() { return etapaPorId(estado.seleccion.etapaId); }
 
 function nuevaEtapa() {
   const numero = estado.etapas.length + 1;
-  const nombre = prompt("Nombre de la etapa:", `Etapa ${numero}`);
-  if (nombre === null) return;
-  const fecha = prompt("Fecha (AAAA-MM-DD):", new Date().toISOString().slice(0, 10));
-  if (fecha === null) return;
-  const etapa = { id: uid(), numero, nombre: nombre.trim() || `Etapa ${numero}`, fecha: (fecha || "").trim(), resultados: {} };
+  const etapa = {
+    id: uid(), numero,
+    nombre: `Etapa ${numero}`,
+    fecha: new Date().toISOString().slice(0, 10),
+    salida: "", recorrido: "", km: "",
+    resultados: {}, metas: [], montana: []
+  };
   estado.etapas.push(etapa);
   estado.seleccion.etapaId = etapa.id;
   guardar();
   renderTodo();
+  abrirFormEtapa(etapa.id); // abre el formulario para completar los datos
 }
 
 function editarEtapa() {
   const e = etapaActual();
   if (!e) return;
-  const nombre = prompt("Nombre de la etapa:", e.nombre); if (nombre === null) return;
-  const fecha = prompt("Fecha (AAAA-MM-DD):", e.fecha); if (fecha === null) return;
-  e.nombre = nombre.trim() || e.nombre;
-  e.fecha = (fecha || "").trim();
+  abrirFormEtapa(e.id);
+}
+
+function abrirFormEtapa(id) {
+  const e = etapaPorId(id);
+  if (!e) return;
+  $("#fe-titulo").textContent = `Datos de la ${e.nombre}`;
+  $("#fe-nombre").value = e.nombre || "";
+  $("#fe-fecha").value = e.fecha || "";
+  $("#fe-salida").value = e.salida || "";
+  $("#fe-km").value = e.km || "";
+  $("#fe-recorrido").value = e.recorrido || "";
+  $("#form-etapa").dataset.editando = id;
+  $("#form-etapa").classList.remove("hidden");
+  $("#fe-nombre").focus();
+}
+
+function guardarFormEtapa() {
+  const id = $("#form-etapa").dataset.editando;
+  const e = etapaPorId(id);
+  if (!e) return;
+  e.nombre = $("#fe-nombre").value.trim() || e.nombre;
+  e.fecha = $("#fe-fecha").value.trim();
+  e.salida = $("#fe-salida").value.trim();
+  e.km = $("#fe-km").value.trim();
+  e.recorrido = $("#fe-recorrido").value.trim();
+  $("#form-etapa").classList.add("hidden");
   guardar();
   renderTodo();
+}
+
+function cancelarFormEtapa() {
+  $("#form-etapa").classList.add("hidden");
 }
 
 function eliminarEtapa() {
@@ -298,8 +328,14 @@ function renderEtapa() {
   vacia.classList.add("hidden"); detalle.classList.remove("hidden");
 
   $("#etapa-titulo").textContent = e.nombre;
-  $("#etapa-info").textContent = (e.fecha ? "Fecha: " + e.fecha + " · " : "") +
-    (tipo === "tiempo" ? "Clasificación por tiempo" : "Clasificación por puntos");
+  const partesInfo = [];
+  if (e.fecha) partesInfo.push("Fecha: " + e.fecha);
+  if (e.salida) partesInfo.push("Salida: " + e.salida);
+  if (e.km) partesInfo.push("Distancia: " + e.km + " km");
+  partesInfo.push(tipo === "tiempo" ? "Clasificación por tiempo" : "Clasificación por puntos");
+  $("#etapa-info").textContent = partesInfo.join(" · ");
+  $("#etapa-recorrido").textContent = e.recorrido ? "Recorrido: " + e.recorrido : "";
+  $("#etapa-recorrido").classList.toggle("hidden", !e.recorrido);
   $("#th-resultado").textContent = tipo === "tiempo" ? "Tiempo (h:mm:ss)" : "Puntos";
 
   // El cronómetro solo tiene sentido cuando se clasifica por tiempo
@@ -580,7 +616,7 @@ function prepararEncabezadoImpresion(subtitulo) {
   $("#print-header").innerHTML = `
     <h1>${escapeHtml(ev.nombre || "Evento de ciclismo")}</h1>
     ${ev.organiza ? `<p>${escapeHtml(ev.organiza)}</p>` : ""}
-    <p><strong>${escapeHtml(subtitulo)}</strong></p>
+    <p><strong>${escapeHtml(subtitulo).replace(/\n/g, "<br>")}</strong></p>
     ${ev.comisario ? `<p>Comisario: ${escapeHtml(ev.comisario)}</p>` : ""}
     <p>Impreso: ${new Date().toLocaleString("es-CR")}</p>`;
 }
@@ -589,7 +625,13 @@ function imprimirEtapa() {
   const e = etapaActual();
   if (!e) return;
   mostrarSoloTab("etapas");
-  prepararEncabezadoImpresion(`Resultados ${e.nombre}${e.fecha ? " · " + e.fecha : ""}`);
+  const detalles = [];
+  if (e.salida) detalles.push("Salida: " + e.salida);
+  if (e.km) detalles.push(e.km + " km");
+  let sub = `Resultados ${e.nombre}${e.fecha ? " · " + e.fecha : ""}`;
+  if (detalles.length) sub += " · " + detalles.join(" · ");
+  if (e.recorrido) sub += "\n" + e.recorrido;
+  prepararEncabezadoImpresion(sub);
   window.print();
 }
 function imprimirGeneral() {
@@ -1184,6 +1226,8 @@ function init() {
   $("#btn-nueva-etapa").addEventListener("click", nuevaEtapa);
   $("#btn-editar-etapa").addEventListener("click", editarEtapa);
   $("#btn-eliminar-etapa").addEventListener("click", eliminarEtapa);
+  $("#fe-guardar").addEventListener("click", guardarFormEtapa);
+  $("#fe-cancelar").addEventListener("click", cancelarFormEtapa);
   $("#sel-etapa").addEventListener("change", (e) => { estado.seleccion.etapaId = e.target.value; guardar(); renderEtapa(); });
   $("#btn-imprimir-etapa").addEventListener("click", imprimirEtapa);
 

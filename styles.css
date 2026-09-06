@@ -198,6 +198,9 @@ hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
 .crono-ultimo, #crono-ultimo { text-align: center; min-height: 1.2em; }
 .crono-ayuda { margin-top: 6px; }
 .crono-ayuda summary { cursor: pointer; color: var(--azul); font-size: 0.85rem; }
+.form-etapa { margin-top: 12px; padding: 12px; background: #f0f5fb; border: 1px solid var(--gris-borde); border-radius: 8px; }
+.form-etapa .sub-h { margin-top: 0; }
+.recorrido { font-size: 0.9rem; color: var(--texto); font-weight: 600; margin: 2px 0 0; }
 .fila-marcada { animation: destello 1s ease; }
 @keyframes destello { from { background: #d9f0e2; } to { background: transparent; } }
 

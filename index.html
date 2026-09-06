@@ -122,6 +122,24 @@
         <button class="btn" id="btn-editar-etapa">✏️ Editar</button>
         <button class="btn danger" id="btn-eliminar-etapa">🗑️ Eliminar etapa</button>
       </div>
+
+      <!-- Formulario de datos de la etapa -->
+      <div id="form-etapa" class="form-etapa hidden">
+        <h3 class="sub-h" id="fe-titulo">Datos de la etapa</h3>
+        <div class="grid">
+          <label>Nombre <input type="text" id="fe-nombre" placeholder="Ej: Etapa 1" /></label>
+          <label>Fecha <input type="date" id="fe-fecha" /></label>
+          <label>Hora de salida <input type="time" id="fe-salida" step="1" /></label>
+          <label>Distancia (km) <input type="text" id="fe-km" placeholder="Ej: 102,0" /></label>
+        </div>
+        <label class="inline" style="max-width:none">Recorrido
+          <input type="text" id="fe-recorrido" placeholder="Ej: Quepos-Dominical-Ciudad Cortés-Palmar Norte" />
+        </label>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" id="fe-guardar">Guardar datos</button>
+          <button class="btn" id="fe-cancelar">Cancelar</button>
+        </div>
+      </div>
     </div>
 
     <div class="card" id="etapa-vacia-msg">
@@ -132,6 +150,7 @@
       <div class="etapa-encabezado">
         <h2 id="etapa-titulo">Etapa</h2>
         <p id="etapa-info" class="muted"></p>
+        <p id="etapa-recorrido" class="recorrido"></p>
       </div>
 
       <!-- Cronómetro (solo modo tiempo) -->

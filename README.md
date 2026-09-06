@@ -28,7 +28,8 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
     columnas `dorsal, nombre, categoria, equipo` para cargar decenas de corredores de una vez.
     Detecta automáticamente el separador (`,`, `;` o tab) y si la primera fila es encabezado.
     Podés **agregar** al final o **reemplazar** la lista. Hay una **plantilla descargable**.
-- **Etapas:** crear varias etapas (con nombre y fecha). Por cada etapa se registra el
+- **Etapas:** crear varias etapas con **nombre, fecha, hora de salida, distancia (km) y recorrido**.
+  Estos datos se muestran en el encabezado de la etapa y salen en la impresión. Por cada etapa se registra el
   **tiempo o puntos** de cada corredor y su **estado**: OK, **DNF** (no finalizó),
   **DNS** (no salió), **DSQ** (descalificado). La posición de cada etapa se calcula sola.
 - **Clasificación general (acumulado):** se calcula automáticamente a partir de las etapas,
