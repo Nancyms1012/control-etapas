@@ -27,9 +27,9 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
 - **Puntuación configurable:** tablas editables de puntos para Metas Volantes, Premios de
   Montaña (por categoría) y Top 10 de etapa. Vienen con los valores de la Federación y se
   pueden cambiar por evento.
-- **Corredores:** dorsal, nombre, categoría y equipo. Agregar, editar, eliminar, buscar y ordenar.
+- **Corredores:** dorsal, nombre, UCI ID, categoría, nacionalidad y equipo. Agregar, editar, eliminar, buscar y ordenar.
   - **Importar desde CSV:** subí un archivo `.csv` (o un Excel guardado como CSV) con las
-    columnas `dorsal, nombre, categoria, equipo` para cargar decenas de corredores de una vez.
+    columnas `dorsal, nombre, uci id, categoria, nac, equipo` para cargar decenas de corredores de una vez.
     Detecta automáticamente el separador (`,`, `;` o tab) y si la primera fila es encabezado.
     Podés **agregar** al final o **reemplazar** la lista. Hay una **plantilla descargable**.
 - **Etapas:** crear varias etapas con **nombre, fecha, hora de salida, distancia (km) y recorrido**.

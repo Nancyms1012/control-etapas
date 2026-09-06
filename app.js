@@ -59,6 +59,10 @@ function migrar() {
   ["metasVolantes", "top10"].forEach((k) => { if (!estado.puntuacion[k]) estado.puntuacion[k] = {}; });
   if (!estado.puntuacion.montana) estado.puntuacion.montana = {};
   if (!estado.seleccion) estado.seleccion = {};
+  (estado.corredores || []).forEach((c) => {
+    if (c.uciid === undefined) c.uciid = "";
+    if (c.nac === undefined) c.nac = "";
+  });
   (estado.etapas || []).forEach((e) => {
     if (!e.metas) e.metas = [];
     if (!e.montana) e.montana = [];
@@ -141,14 +145,16 @@ function corredorPorId(id) { return estado.corredores.find((c) => c.id === id); 
 function agregarCorredor() {
   const dorsal = $("#c-dorsal").value.trim();
   const nombre = $("#c-nombre").value.trim();
+  const uciid = $("#c-uciid").value.trim();
   const categoria = $("#c-categoria").value.trim();
+  const nac = $("#c-nac").value.trim();
   const equipo = $("#c-equipo").value.trim();
   if (!nombre) { alert("El nombre es obligatorio."); return; }
   if (dorsal && estado.corredores.some((c) => String(c.dorsal) === String(dorsal))) {
     if (!confirm("Ya existe un corredor con ese dorsal. ¿Agregar de todos modos?")) return;
   }
-  estado.corredores.push({ id: uid(), dorsal, nombre, categoria, equipo });
-  ["#c-dorsal", "#c-nombre", "#c-categoria", "#c-equipo"].forEach((s) => ($(s).value = ""));
+  estado.corredores.push({ id: uid(), dorsal, nombre, uciid, categoria, nac, equipo });
+  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-categoria", "#c-nac", "#c-equipo"].forEach((s) => ($(s).value = ""));
   $("#c-dorsal").focus();
   guardar();
   renderTodo();
@@ -172,7 +178,7 @@ function renderCorredores() {
 
   if (filtro) {
     lista = lista.filter((c) =>
-      [c.dorsal, c.nombre, c.categoria, c.equipo].join(" ").toLowerCase().includes(filtro));
+      [c.dorsal, c.nombre, c.uciid, c.categoria, c.nac, c.equipo].join(" ").toLowerCase().includes(filtro));
   }
 
   tbody.innerHTML = "";
@@ -181,7 +187,9 @@ function renderCorredores() {
     tr.innerHTML = `
       <td>${escapeHtml(c.dorsal)}</td>
       <td>${escapeHtml(c.nombre)}</td>
+      <td>${escapeHtml(c.uciid)}</td>
       <td>${escapeHtml(c.categoria)}</td>
+      <td>${escapeHtml(c.nac)}</td>
       <td>${escapeHtml(c.equipo)}</td>
       <td class="no-print">
         <span class="link-action" data-edit="${c.id}">✏️</span>
@@ -214,9 +222,14 @@ function editarCorredor(id) {
   if (!c) return;
   const dorsal = prompt("Dorsal:", c.dorsal); if (dorsal === null) return;
   const nombre = prompt("Nombre:", c.nombre); if (nombre === null) return;
+  const uciid = prompt("UCI ID:", c.uciid || ""); if (uciid === null) return;
   const categoria = prompt("Categoría:", c.categoria); if (categoria === null) return;
+  const nac = prompt("Nacionalidad:", c.nac || ""); if (nac === null) return;
   const equipo = prompt("Equipo:", c.equipo); if (equipo === null) return;
-  Object.assign(c, { dorsal: dorsal.trim(), nombre: nombre.trim(), categoria: categoria.trim(), equipo: equipo.trim() });
+  Object.assign(c, {
+    dorsal: dorsal.trim(), nombre: nombre.trim(), uciid: uciid.trim(),
+    categoria: categoria.trim(), nac: nac.trim(), equipo: equipo.trim()
+  });
   guardar();
   renderTodo();
 }
@@ -739,24 +752,27 @@ function importarCSV(file) {
       if (!filas.length) { setCsvMsg("El archivo está vacío.", true); return; }
 
       // Detecta si la primera fila es encabezado
-      const cabecerasConocidas = ["dorsal", "nombre", "categoria", "equipo", "numero", "nro", "#"];
+      const cabecerasConocidas = ["dorsal", "nombre", "uciid", "uci id", "uci", "categoria", "nac", "nacionalidad", "pais", "equipo", "numero", "nro", "#"];
       const primera = filas[0].map(normalizar);
       const esEncabezado = primera.some((c) => cabecerasConocidas.includes(c));
 
-      // Mapa de columnas: por defecto orden dorsal,nombre,categoria,equipo
-      let idx = { dorsal: 0, nombre: 1, categoria: 2, equipo: 3 };
+      // Mapa de columnas: por defecto orden dorsal,nombre,uciid,categoria,nac,equipo
+      const ordenDefecto = { dorsal: 0, nombre: 1, uciid: 2, categoria: 3, nac: 4, equipo: 5 };
+      let idx = Object.assign({}, ordenDefecto);
       let inicio = 0;
       if (esEncabezado) {
         inicio = 1;
-        idx = { dorsal: -1, nombre: -1, categoria: -1, equipo: -1 };
+        idx = { dorsal: -1, nombre: -1, uciid: -1, categoria: -1, nac: -1, equipo: -1 };
         primera.forEach((c, i) => {
           if (["dorsal", "numero", "nro", "#", "num"].includes(c)) idx.dorsal = i;
           else if (["nombre", "corredor", "atleta", "nombres"].includes(c)) idx.nombre = i;
+          else if (["uciid", "uci id", "uci", "id uci", "uci_id"].includes(c)) idx.uciid = i;
           else if (["categoria", "cat", "categoría"].includes(c)) idx.categoria = i;
+          else if (["nac", "nacionalidad", "pais", "país", "nacion"].includes(c)) idx.nac = i;
           else if (["equipo", "club", "team"].includes(c)) idx.equipo = i;
         });
         // Si no se reconoció "nombre", cae al orden por posición
-        if (idx.nombre === -1) idx = { dorsal: 0, nombre: 1, categoria: 2, equipo: 3 };
+        if (idx.nombre === -1) idx = Object.assign({}, ordenDefecto);
       }
 
       const nuevos = [];
@@ -769,7 +785,9 @@ function importarCSV(file) {
           id: uid(),
           dorsal: get("dorsal"),
           nombre,
+          uciid: get("uciid"),
           categoria: get("categoria"),
+          nac: get("nac"),
           equipo: get("equipo")
         });
       }
@@ -809,10 +827,10 @@ function setCsvMsg(txt, error) {
 }
 
 function descargarPlantillaCSV() {
-  const contenido = "dorsal,nombre,categoria,equipo\n" +
-    "1,Juan Pérez,Elite,Club Ciclista San José\n" +
-    "2,María Rodríguez,Máster A,Team Cartago\n" +
-    "3,Carlos Mora,Sub-23,\n";
+  const contenido = "dorsal,nombre,uci id,categoria,nac,equipo\n" +
+    "1,Juan Pérez,10012345678,Elite,CRC,Club Ciclista San José\n" +
+    "2,María Rodríguez,10087654321,Máster A,CRC,Team Cartago\n" +
+    "3,Carlos Mora,,Sub-23,MEX,\n";
   // BOM para que Excel abra bien los acentos
   const blob = new Blob(["\uFEFF" + contenido], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
@@ -1357,7 +1375,7 @@ function init() {
 
   // Corredores
   $("#btn-add-corredor").addEventListener("click", agregarCorredor);
-  ["#c-dorsal", "#c-nombre", "#c-categoria", "#c-equipo"].forEach((s) =>
+  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-categoria", "#c-nac", "#c-equipo"].forEach((s) =>
     $(s).addEventListener("keydown", (e) => { if (e.key === "Enter") agregarCorredor(); }));
   $("#buscar-corredor").addEventListener("input", renderCorredores);
   $("#btn-importar-csv").addEventListener("click", () => $("#file-csv").click());

@@ -62,7 +62,9 @@
       <div class="grid">
         <label>Dorsal <input type="number" id="c-dorsal" min="1" /></label>
         <label>Nombre <input type="text" id="c-nombre" /></label>
+        <label>UCI ID <input type="text" id="c-uciid" placeholder="Opcional" /></label>
         <label>Categoría <input type="text" id="c-categoria" list="cats" placeholder="Elite, Máster, Sub-23..." /></label>
+        <label>Nacionalidad <input type="text" id="c-nac" placeholder="Ej: CRC" /></label>
         <label>Equipo <input type="text" id="c-equipo" /></label>
       </div>
       <datalist id="cats"></datalist>
@@ -72,7 +74,7 @@
       <h3 class="sub-h">📥 Importar lista desde CSV</h3>
       <p class="muted">
         Subí un archivo <strong>.csv</strong> (o Excel guardado como CSV) con las columnas:
-        <code>dorsal, nombre, categoria, equipo</code>. La primera fila puede ser el encabezado.
+        <code>dorsal, nombre, uci id, categoria, nac, equipo</code>. La primera fila puede ser el encabezado.
       </p>
       <div class="btn-row">
         <button class="btn" id="btn-importar-csv">📥 Subir CSV de corredores</button>
@@ -99,7 +101,9 @@
             <tr>
               <th data-sort="dorsal">Dorsal</th>
               <th data-sort="nombre">Nombre</th>
+              <th data-sort="uciid">UCI ID</th>
               <th data-sort="categoria">Categoría</th>
+              <th data-sort="nac">Nac.</th>
               <th data-sort="equipo">Equipo</th>
               <th class="no-print">Acciones</th>
             </tr>
