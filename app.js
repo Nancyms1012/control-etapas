@@ -13,10 +13,9 @@ const PUNTUACION_DEFECTO = {
   // Top 10 de etapa: posición -> puntos
   top10: { 1: 15, 2: 12, 3: 10, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
   // Premios de montaña: por categoría -> { posición: puntos }
+  // Valores oficiales (Guía Técnica FECOCI): 3ª cat = 6/4/2/1, 4ª cat = 4/2/1.
   montana: {
-    1: { 1: 4, 2: 2, 3: 1 },
-    2: { 1: 4, 2: 2, 3: 1 },
-    3: { 1: 6, 2: 3, 3: 2, 4: 2, 5: 1 },
+    3: { 1: 6, 2: 4, 3: 2, 4: 1 },
     4: { 1: 4, 2: 2, 3: 1 }
   }
 };
@@ -59,6 +58,7 @@ function migrar() {
   ["metasVolantes", "top10"].forEach((k) => { if (!estado.puntuacion[k]) estado.puntuacion[k] = {}; });
   if (!estado.puntuacion.montana) estado.puntuacion.montana = {};
   if (!estado.seleccion) estado.seleccion = {};
+  if (!estado.caravana) estado.caravana = [];
   (estado.corredores || []).forEach((c) => {
     if (c.uciid === undefined) c.uciid = "";
     if (c.nac === undefined) c.nac = "";
@@ -494,6 +494,31 @@ function marcarNoFinaliza(actual, nuevo) {
   // prioridad DSQ > DNF > DNS
   const prioridad = { ok: 0, DNS: 1, DNF: 2, DSQ: 3 };
   return prioridad[nuevo] > prioridad[actual] ? nuevo : actual;
+}
+
+// Mapa corredorId -> posición en la general individual por tiempos.
+// Se usa como último criterio de desempate en metas volantes y montaña.
+function posicionesGeneralTiempos() {
+  const mapa = {};
+  // Fuerza el cálculo por tiempo aunque el evento esté en modo puntos
+  const tipoPrev = estado.evento.tipo;
+  estado.evento.tipo = "tiempo";
+  try {
+    calcularGeneral().forEach((f) => { if (f.posicion) mapa[f.corredor.id] = f.posicion; });
+  } finally {
+    estado.evento.tipo = tipoPrev;
+  }
+  return mapa;
+}
+
+// Compara dos corredores por conteo de posiciones (más 1os, luego 2os, etc.).
+// conteoA/conteoB: objeto { pos: cantidad }. Devuelve negativo si A va antes.
+function compararPorConteoPosiciones(conteoA, conteoB, maxPos) {
+  for (let p = 1; p <= maxPos; p++) {
+    const a = conteoA[p] || 0, b = conteoB[p] || 0;
+    if (a !== b) return b - a; // más cantidad = mejor
+  }
+  return 0;
 }
 
 function renderGeneral() {
@@ -1102,23 +1127,41 @@ function agregarMetaVolante() {
 }
 
 function calcularGeneralMV() {
-  const puntos = {}; // corredorId -> total
+  const puntos = {};  // corredorId -> total puntos
+  const conteo = {};  // corredorId -> { pos: cantidad de veces }
+  let maxPos = 1;
+
   estado.etapas.forEach((e) => {
     (e.metas || []).forEach((m) => {
       const porCat = m.ganadoresPorCat || {};
       Object.keys(porCat).forEach((cat) => {
         Object.keys(porCat[cat]).forEach((pos) => {
           const cid = porCat[cat][pos];
+          if (!cid) return;
           const pts = estado.puntuacion.metasVolantes[pos] || 0;
-          if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+          puntos[cid] = (puntos[cid] || 0) + pts;
+          if (!conteo[cid]) conteo[cid] = {};
+          conteo[cid][pos] = (conteo[cid][pos] || 0) + 1;
+          maxPos = Math.max(maxPos, +pos);
         });
       });
     });
   });
+
+  const posTiempos = posicionesGeneralTiempos();
   return estado.corredores
-    .map((c) => ({ corredor: c, total: puntos[c.id] || 0 }))
+    .map((c) => ({ corredor: c, total: puntos[c.id] || 0, conteo: conteo[c.id] || {} }))
     .filter((f) => f.total > 0)
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => {
+      // 1) más puntos
+      if (b.total !== a.total) return b.total - a.total;
+      // 2) desempate: más 1os, luego 2os, 3os...
+      const cmp = compararPorConteoPosiciones(a.conteo, b.conteo, maxPos);
+      if (cmp !== 0) return cmp;
+      // 3) mejor en la general de tiempos
+      const pa = posTiempos[a.corredor.id] || 9999, pb = posTiempos[b.corredor.id] || 9999;
+      return pa - pb;
+    });
 }
 
 function renderGeneralMV() {
@@ -1262,6 +1305,9 @@ function agregarPremioMontana() {
 
 function calcularGeneralPM() {
   const puntos = {};
+  // primerosPorCatPremio[corredorId][categoriaPremio] = cantidad de 1os puestos
+  const primeros = {};
+
   estado.etapas.forEach((e) => {
     (e.montana || []).forEach((pm) => {
       const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
@@ -1269,16 +1315,39 @@ function calcularGeneralPM() {
       Object.keys(porCat).forEach((cat) => {
         Object.keys(porCat[cat]).forEach((pos) => {
           const cid = porCat[cat][pos];
+          if (!cid) return;
           const pts = tablaCat[pos] || 0;
-          if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+          puntos[cid] = (puntos[cid] || 0) + pts;
+          if (+pos === 1) {
+            if (!primeros[cid]) primeros[cid] = {};
+            primeros[cid][pm.categoria] = (primeros[cid][pm.categoria] || 0) + 1;
+          }
         });
       });
     });
   });
+
+  // Categorías de premio ordenadas de la "más elevada" a la menor.
+  // En ciclismo la 1ª es la más dura; con la config actual (3 y 4) equivale a
+  // ordenar de menor número a mayor: 3 antes que 4.
+  const catsPremioOrden = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+  const posTiempos = posicionesGeneralTiempos();
+
   return estado.corredores
-    .map((c) => ({ corredor: c, total: puntos[c.id] || 0 }))
+    .map((c) => ({ corredor: c, total: puntos[c.id] || 0, primeros: primeros[c.id] || {} }))
     .filter((f) => f.total > 0)
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => {
+      // 1) más puntos
+      if (b.total !== a.total) return b.total - a.total;
+      // 2) desempate: más 1os en la categoría más elevada, luego la siguiente...
+      for (const cat of catsPremioOrden) {
+        const pa = a.primeros[cat] || 0, pb = b.primeros[cat] || 0;
+        if (pa !== pb) return pb - pa;
+      }
+      // 3) mejor en la general de tiempos
+      const ta = posTiempos[a.corredor.id] || 9999, tb = posTiempos[b.corredor.id] || 9999;
+      return ta - tb;
+    });
 }
 
 function renderGeneralPM() {
@@ -1322,6 +1391,227 @@ function imprimirGeneralPM() {
   window.print();
 }
 
+/* ================================================================
+   CLASIFICACIÓN POR EQUIPOS
+   ================================================================ */
+
+// Lista de equipos presentes en la inscripción (no vacíos).
+function equiposLista() {
+  return [...new Set(estado.corredores.map((c) => (c.equipo || "").trim()).filter(Boolean))].sort();
+}
+
+// Clasificación por equipos de UNA etapa.
+// Cada equipo = suma de los 3 mejores tiempos (corredores con tiempo válido y estado ok).
+// Devuelve filas ordenadas con: equipo, seg (suma), sumaPuestos, mejorPuesto, completos(bool).
+function calcularEquiposEtapa(etapa) {
+  const posiciones = calcularPosicionesEtapa(etapa); // corredorId -> puesto individual en la etapa
+  const porEquipo = {};
+
+  estado.corredores.forEach((c) => {
+    const eq = (c.equipo || "").trim();
+    if (!eq) return;
+    const r = etapa.resultados[c.id];
+    if (!r || r.estado !== "ok") return;
+    const seg = tiempoASegundos(r.tiempo);
+    if (seg == null) return;
+    const puesto = posiciones[c.id] || 9999;
+    if (!porEquipo[eq]) porEquipo[eq] = [];
+    porEquipo[eq].push({ seg, puesto });
+  });
+
+  const filas = Object.keys(porEquipo).map((eq) => {
+    const corredores = porEquipo[eq].sort((a, b) => a.seg - b.seg);
+    const mejores3 = corredores.slice(0, 3);
+    const completos = mejores3.length >= 3;
+    const seg = mejores3.reduce((s, x) => s + x.seg, 0);
+    const sumaPuestos = mejores3.reduce((s, x) => s + x.puesto, 0);
+    const mejorPuesto = mejores3.length ? Math.min(...mejores3.map((x) => x.puesto)) : 9999;
+    return { equipo: eq, seg, sumaPuestos, mejorPuesto, completos, cantidad: mejores3.length };
+  }).filter((f) => f.completos); // se necesita al menos 3 tiempos
+
+  // Orden diaria: menor tiempo; desempate suma de puestos; luego mejor corredor
+  filas.sort((a, b) => {
+    if (a.seg !== b.seg) return a.seg - b.seg;
+    if (a.sumaPuestos !== b.sumaPuestos) return a.sumaPuestos - b.sumaPuestos;
+    return a.mejorPuesto - b.mejorPuesto;
+  });
+  filas.forEach((f, i) => (f.posicion = i + 1));
+  return filas;
+}
+
+// Clasificación general por equipos: suma de los 3 mejores tiempos de todas las etapas.
+function calcularEquiposGeneral() {
+  const acum = {}; // equipo -> { seg, etapasCompletas, primeros:{pos:cant} }
+  const posEtapaPorEquipo = {}; // equipo -> [puestos en cada etapa]
+
+  // recolectar puestos de la clasificación por equipos de cada etapa (para desempate)
+  estado.etapas.forEach((e) => {
+    const clasif = calcularEquiposEtapa(e);
+    clasif.forEach((f) => {
+      if (!posEtapaPorEquipo[f.equipo]) posEtapaPorEquipo[f.equipo] = {};
+      posEtapaPorEquipo[f.equipo][f.posicion] = (posEtapaPorEquipo[f.equipo][f.posicion] || 0) + 1;
+    });
+  });
+
+  const posIndiv = posicionesGeneralTiempos(); // corredorId -> pos general individual
+
+  // suma de tiempos por equipo (3 mejores por etapa, sumados en todas las etapas)
+  const equipos = equiposLista();
+  const filas = equipos.map((eq) => {
+    let seg = 0, etapasValidas = 0, completoTodas = true;
+    estado.etapas.forEach((e) => {
+      const clasif = calcularEquiposEtapa(e).find((f) => f.equipo === eq);
+      if (clasif) { seg += clasif.seg; etapasValidas++; }
+      else completoTodas = false;
+    });
+    // mejor corredor del equipo en la general individual (para último desempate)
+    let mejorIndiv = 9999;
+    estado.corredores.forEach((c) => {
+      if ((c.equipo || "").trim() === eq && posIndiv[c.id]) mejorIndiv = Math.min(mejorIndiv, posIndiv[c.id]);
+    });
+    return {
+      equipo: eq, seg, etapasValidas, completoTodas,
+      primeros: posEtapaPorEquipo[eq] || {}, mejorIndiv
+    };
+  }).filter((f) => f.etapasValidas > 0);
+
+  const maxPos = equipos.length || 1;
+  filas.sort((a, b) => {
+    // solo comparan directo si ambos completaron todas las etapas; los incompletos van al final
+    if (a.completoTodas !== b.completoTodas) return a.completoTodas ? -1 : 1;
+    if (a.seg !== b.seg) return a.seg - b.seg;
+    // desempate: más 1os en la clasif por equipos de etapa, luego 2os...
+    const cmp = compararPorConteoPosiciones(a.primeros, b.primeros, maxPos);
+    if (cmp !== 0) return cmp;
+    // luego mejor corredor en la general individual
+    return a.mejorIndiv - b.mejorIndiv;
+  });
+  filas.forEach((f, i) => (f.posicion = i + 1));
+  return filas;
+}
+
+function renderEquipos() {
+  // Diaria (etapa seleccionada, reutiliza el selector propio de esta pestaña)
+  const sel = $("#sel-etapa-eq");
+  if (sel) {
+    sel.innerHTML = estado.etapas.map((e) =>
+      `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`).join("");
+    if (!estado.seleccion.etapaEq && estado.etapas.length) estado.seleccion.etapaEq = estado.etapas[0].id;
+    if (estado.seleccion.etapaEq) sel.value = estado.seleccion.etapaEq;
+  }
+
+  const e = etapaPorId(estado.seleccion.etapaEq);
+  const tbodyD = $("#tabla-equipos-etapa tbody");
+  if (e) {
+    const filas = calcularEquiposEtapa(e);
+    tbodyD.innerHTML = filas.map((f) => `
+      <tr class="${f.posicion <= 3 ? "pos-" + f.posicion : ""}">
+        <td>${f.posicion}</td>
+        <td>${escapeHtml(f.equipo)}</td>
+        <td>${segundosATiempo(f.seg)}</td>
+      </tr>`).join("") || `<tr><td colspan="3" class="empty">No hay equipos con al menos 3 tiempos en esta etapa.</td></tr>`;
+  } else {
+    tbodyD.innerHTML = `<tr><td colspan="3" class="empty">No hay etapas.</td></tr>`;
+  }
+
+  // General
+  const filasG = calcularEquiposGeneral();
+  const lider = filasG.find((f) => f.posicion === 1);
+  const tbodyG = $("#tabla-equipos-general tbody");
+  tbodyG.innerHTML = filasG.map((f) => {
+    const dif = (lider && f.completoTodas && f.posicion !== 1) ? "+" + segundosATiempo(f.seg - lider.seg)
+      : (f.posicion === 1 ? "—" : "");
+    return `<tr class="${f.posicion <= 3 ? "pos-" + f.posicion : ""}">
+      <td>${f.posicion}</td>
+      <td>${escapeHtml(f.equipo)}</td>
+      <td>${segundosATiempo(f.seg)}${f.completoTodas ? "" : " *"}</td>
+      <td>${dif}</td>
+      <td>${f.etapasValidas}/${estado.etapas.length}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">Aún no hay datos suficientes.</td></tr>`;
+
+  const info = $("#equipos-info");
+  if (info) info.textContent = "Suma de los 3 mejores tiempos por equipo. (*) no completó todas las etapas.";
+}
+
+function imprimirEquipos() {
+  mostrarSoloTab("equipos");
+  prepararEncabezadoImpresion("Clasificación por Equipos");
+  window.print();
+}
+
+/* ================================================================
+   ORDEN DE CARAVANA (rifa por cantidad de integrantes)
+   ================================================================ */
+// Cantidad de corredores por equipo.
+function integrantesPorEquipo() {
+  const conteo = {};
+  estado.corredores.forEach((c) => {
+    const eq = (c.equipo || "").trim();
+    if (!eq) return;
+    conteo[eq] = (conteo[eq] || 0) + 1;
+  });
+  return conteo; // { equipo: cantidad }
+}
+
+// Grupo de rifa según cantidad: 1 = 5-6, 2 = 4-3, 3 = menos de 3.
+function grupoCaravana(cant) {
+  if (cant >= 5) return 1;
+  if (cant >= 3) return 2;
+  return 3;
+}
+
+const NOMBRE_GRUPO_CARAVANA = {
+  1: "1° Equipos de 5 o 6 corredores",
+  2: "2° Equipos de 4 y 3 corredores",
+  3: "3° Equipos de menos de 3 corredores"
+};
+
+// Genera (rifa) un orden aleatorio dentro de cada grupo y lo guarda.
+function rifarCaravana() {
+  const conteo = integrantesPorEquipo();
+  const grupos = { 1: [], 2: [], 3: [] };
+  Object.keys(conteo).forEach((eq) => grupos[grupoCaravana(conteo[eq])].push(eq));
+
+  // baraja cada grupo (Fisher–Yates)
+  const orden = [];
+  [1, 2, 3].forEach((g) => {
+    const arr = grupos[g];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    arr.forEach((eq) => orden.push({ equipo: eq, grupo: g, integrantes: conteo[eq] }));
+  });
+
+  estado.caravana = orden;
+  guardar();
+  renderCaravana();
+}
+
+function renderCaravana() {
+  const tbody = $("#tabla-caravana tbody");
+  if (!tbody) return;
+  const orden = estado.caravana || [];
+  if (!orden.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty">Presioná “🎲 Rifar orden” para generar el orden de caravana.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = orden.map((o, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(o.equipo)}</td>
+      <td>${o.integrantes}</td>
+      <td class="muted">${escapeHtml(NOMBRE_GRUPO_CARAVANA[o.grupo])}</td>
+    </tr>`).join("");
+}
+
+function imprimirCaravana() {
+  mostrarSoloTab("equipos");
+  prepararEncabezadoImpresion("Orden de Caravana");
+  window.print();
+}
+
 /* ---------- UI ---------- */
 function escapeHtml(str) {
   return String(str == null ? "" : str)
@@ -1350,6 +1640,8 @@ function renderTodo() {
   renderGeneral();
   renderPuntuacion();
   renderMV_PM();
+  renderEquipos();
+  renderCaravana();
   actualizarDatalistCategorias();
 }
 
@@ -1426,6 +1718,12 @@ function init() {
   $("#btn-add-premio").addEventListener("click", agregarPremioMontana);
   $("#btn-imprimir-pm").addEventListener("click", imprimirGeneralPM);
   $("#filtro-cat-pm").addEventListener("change", renderGeneralPM);
+
+  // Equipos
+  $("#sel-etapa-eq").addEventListener("change", (e) => { estado.seleccion.etapaEq = e.target.value; guardar(); renderEquipos(); });
+  $("#btn-imprimir-equipos").addEventListener("click", imprimirEquipos);
+  $("#btn-rifar-caravana").addEventListener("click", rifarCaravana);
+  $("#btn-imprimir-caravana").addEventListener("click", imprimirCaravana);
 
   // Respaldo
   $("#btn-exportar").addEventListener("click", exportar);

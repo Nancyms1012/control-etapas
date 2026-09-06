@@ -22,8 +22,19 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
   categoría** (avisa si no lo es). Las categorías se detectan solas según los corredores inscritos.
   Genera la **clasificación general de metas volantes** (rey de las metas) con filtro por categoría.
 - **Premios de Montaña (por categoría):** igual que las metas, pero cada premio tiene además su
-  **categoría de premio** (1/2/3/4) que define cuántos puntos reparte. Dentro, se registra por cada
-  categoría de corredor. Genera la **clasificación general de montaña** (rey de la montaña) con filtro.
+  **categoría de premio** (3/4 por defecto, configurable) que define cuántos puntos reparte. Dentro,
+  se registra por cada categoría de corredor. Genera la **clasificación general de montaña** (rey de
+  la montaña) con filtro.
+- **Desempates (según Guía Técnica FECOCI):**
+  - *Metas volantes:* más 1os puestos → más 2os, 3os… → mejor puesto en la general individual por tiempos.
+  - *Montaña:* más 1os en la categoría de premio más elevada → siguiente categoría… → general individual.
+- **Clasificación por Equipos:**
+  - *Diaria (por etapa):* suma de los **3 mejores tiempos** del equipo; menor tiempo gana. Desempate por
+    suma de puestos de esos 3 y luego por su mejor corredor. Equipos con menos de 3 tiempos quedan fuera.
+  - *General:* suma de los 3 mejores tiempos de todas las etapas. Desempate por más 1os/2os en la
+    clasificación por equipos de etapa y luego por el mejor corredor en la general individual.
+- **Orden de Caravana:** rifa (sorteo) del orden por grupos según la cantidad de integrantes de cada
+  equipo: primero los de 5-6, luego los de 4-3, y por último los de menos de 3 corredores.
 - **Puntuación configurable:** tablas editables de puntos para Metas Volantes, Premios de
   Montaña (por categoría) y Top 10 de etapa. Vienen con los valores de la Federación y se
   pueden cambiar por evento.
