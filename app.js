@@ -1048,7 +1048,14 @@ function calcularGeneralMV() {
 }
 
 function renderGeneralMV() {
-  const filas = calcularGeneralMV();
+  actualizarFiltroCat("#filtro-cat-mv");
+  const filtro = ($("#filtro-cat-mv") && $("#filtro-cat-mv").value) || "";
+  let filas = calcularGeneralMV();
+  if (filtro) filas = filas.filter((f) => (f.corredor.categoria || "") === filtro);
+
+  const info = $("#mv-general-info");
+  if (info) info.textContent = filtro ? "Categoría: " + filtro : "Todas las categorías";
+
   const tbody = $("#tabla-general-mv tbody");
   tbody.innerHTML = filas.map((f, i) => {
     const c = f.corredor;
@@ -1061,6 +1068,17 @@ function renderGeneralMV() {
       <td>${f.total}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" class="empty">Aún no hay puntos registrados.</td></tr>`;
+}
+
+// Rellena un <select> de categorías (de corredores) conservando la selección.
+function actualizarFiltroCat(sel) {
+  const el = $(sel);
+  if (!el) return;
+  const cats = [...new Set(estado.corredores.map((c) => c.categoria).filter(Boolean))].sort();
+  const actual = el.value;
+  el.innerHTML = '<option value="">Todas las categorías</option>' +
+    cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  el.value = actual;
 }
 
 /* ---- Premios de Montaña ---- */
@@ -1168,7 +1186,14 @@ function calcularGeneralPM() {
 }
 
 function renderGeneralPM() {
-  const filas = calcularGeneralPM();
+  actualizarFiltroCat("#filtro-cat-pm");
+  const filtro = ($("#filtro-cat-pm") && $("#filtro-cat-pm").value) || "";
+  let filas = calcularGeneralPM();
+  if (filtro) filas = filas.filter((f) => (f.corredor.categoria || "") === filtro);
+
+  const info = $("#pm-general-info");
+  if (info) info.textContent = filtro ? "Categoría: " + filtro : "Todas las categorías";
+
   const tbody = $("#tabla-general-pm tbody");
   tbody.innerHTML = filas.map((f, i) => {
     const c = f.corredor;
@@ -1190,12 +1215,14 @@ function renderMV_PM() {
 
 function imprimirGeneralMV() {
   mostrarSoloTab("metas");
-  prepararEncabezadoImpresion("Clasificación general · Metas Volantes");
+  const cat = ($("#filtro-cat-mv") && $("#filtro-cat-mv").value) || "";
+  prepararEncabezadoImpresion("Clasificación general · Metas Volantes" + (cat ? " · Categoría: " + cat : ""));
   window.print();
 }
 function imprimirGeneralPM() {
   mostrarSoloTab("montana");
-  prepararEncabezadoImpresion("Clasificación general · Premios de Montaña");
+  const cat = ($("#filtro-cat-pm") && $("#filtro-cat-pm").value) || "";
+  prepararEncabezadoImpresion("Clasificación general · Premios de Montaña" + (cat ? " · Categoría: " + cat : ""));
   window.print();
 }
 
@@ -1296,11 +1323,13 @@ function init() {
   $("#sel-etapa-mv").addEventListener("change", (e) => { estado.seleccion.etapaMV = e.target.value; guardar(); renderMetasVolantes(); });
   $("#btn-add-meta").addEventListener("click", agregarMetaVolante);
   $("#btn-imprimir-mv").addEventListener("click", imprimirGeneralMV);
+  $("#filtro-cat-mv").addEventListener("change", renderGeneralMV);
 
   // Premios de Montaña
   $("#sel-etapa-pm").addEventListener("change", (e) => { estado.seleccion.etapaPM = e.target.value; guardar(); renderPremiosMontana(); });
   $("#btn-add-premio").addEventListener("click", agregarPremioMontana);
   $("#btn-imprimir-pm").addEventListener("click", imprimirGeneralPM);
+  $("#filtro-cat-pm").addEventListener("change", renderGeneralPM);
 
   // Respaldo
   $("#btn-exportar").addEventListener("click", exportar);
