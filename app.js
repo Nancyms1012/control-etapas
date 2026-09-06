@@ -496,6 +496,132 @@ function borrarTodo() {
   location.reload();
 }
 
+/* ---------- Importar corredores desde CSV ---------- */
+// Parser de CSV que soporta comillas, comas/;/tab dentro de campos y saltos de línea escapados.
+function parseCSV(texto) {
+  // Detecta separador: coma, punto y coma o tabulación (el más frecuente en la 1ª línea)
+  const primera = texto.split(/\r?\n/)[0] || "";
+  const conteo = { ",": (primera.match(/,/g) || []).length,
+                   ";": (primera.match(/;/g) || []).length,
+                   "\t": (primera.match(/\t/g) || []).length };
+  const sep = Object.keys(conteo).reduce((a, b) => (conteo[b] > conteo[a] ? b : a), ",");
+
+  const filas = [];
+  let campo = "", fila = [], enComillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i];
+    if (enComillas) {
+      if (ch === '"') {
+        if (texto[i + 1] === '"') { campo += '"'; i++; }
+        else enComillas = false;
+      } else campo += ch;
+    } else {
+      if (ch === '"') enComillas = true;
+      else if (ch === sep) { fila.push(campo); campo = ""; }
+      else if (ch === "\n") { fila.push(campo); filas.push(fila); fila = []; campo = ""; }
+      else if (ch === "\r") { /* ignora */ }
+      else campo += ch;
+    }
+  }
+  if (campo !== "" || fila.length) { fila.push(campo); filas.push(fila); }
+  return filas.filter((f) => f.some((c) => (c || "").trim() !== ""));
+}
+
+function normalizar(s) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function importarCSV(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const filas = parseCSV(reader.result);
+      if (!filas.length) { setCsvMsg("El archivo está vacío.", true); return; }
+
+      // Detecta si la primera fila es encabezado
+      const cabecerasConocidas = ["dorsal", "nombre", "categoria", "equipo", "numero", "nro", "#"];
+      const primera = filas[0].map(normalizar);
+      const esEncabezado = primera.some((c) => cabecerasConocidas.includes(c));
+
+      // Mapa de columnas: por defecto orden dorsal,nombre,categoria,equipo
+      let idx = { dorsal: 0, nombre: 1, categoria: 2, equipo: 3 };
+      let inicio = 0;
+      if (esEncabezado) {
+        inicio = 1;
+        idx = { dorsal: -1, nombre: -1, categoria: -1, equipo: -1 };
+        primera.forEach((c, i) => {
+          if (["dorsal", "numero", "nro", "#", "num"].includes(c)) idx.dorsal = i;
+          else if (["nombre", "corredor", "atleta", "nombres"].includes(c)) idx.nombre = i;
+          else if (["categoria", "cat", "categoría"].includes(c)) idx.categoria = i;
+          else if (["equipo", "club", "team"].includes(c)) idx.equipo = i;
+        });
+        // Si no se reconoció "nombre", cae al orden por posición
+        if (idx.nombre === -1) idx = { dorsal: 0, nombre: 1, categoria: 2, equipo: 3 };
+      }
+
+      const nuevos = [];
+      for (let r = inicio; r < filas.length; r++) {
+        const f = filas[r];
+        const get = (k) => (idx[k] >= 0 && idx[k] < f.length ? (f[idx[k]] || "").trim() : "");
+        const nombre = get("nombre");
+        if (!nombre) continue; // se salta filas sin nombre
+        nuevos.push({
+          id: uid(),
+          dorsal: get("dorsal"),
+          nombre,
+          categoria: get("categoria"),
+          equipo: get("equipo")
+        });
+      }
+
+      if (!nuevos.length) {
+        setCsvMsg("No se encontraron corredores válidos (revisá que haya una columna de nombre).", true);
+        return;
+      }
+
+      const reemplazar = $("#csv-reemplazar").checked;
+      const accion = reemplazar
+        ? `REEMPLAZAR la lista actual (${estado.corredores.length}) por ${nuevos.length} corredores`
+        : `AGREGAR ${nuevos.length} corredores a los ${estado.corredores.length} existentes`;
+      if (!confirm(`Se van a importar ${nuevos.length} corredores.\n\nAcción: ${accion}.\n\n¿Continuar?`)) return;
+
+      if (reemplazar) {
+        estado.corredores = nuevos;
+        // limpia resultados que apuntaban a corredores viejos
+        estado.etapas.forEach((e) => (e.resultados = {}));
+      } else {
+        estado.corredores = estado.corredores.concat(nuevos);
+      }
+      guardar();
+      renderTodo();
+      setCsvMsg(`✓ Importados ${nuevos.length} corredores correctamente.`, false);
+    } catch (e) {
+      setCsvMsg("No se pudo leer el CSV: " + e.message, true);
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+function setCsvMsg(txt, error) {
+  const el = $("#csv-msg");
+  el.textContent = txt;
+  el.style.color = error ? "var(--rojo)" : "var(--verde)";
+}
+
+function descargarPlantillaCSV() {
+  const contenido = "dorsal,nombre,categoria,equipo\n" +
+    "1,Juan Pérez,Elite,Club Ciclista San José\n" +
+    "2,María Rodríguez,Máster A,Team Cartago\n" +
+    "3,Carlos Mora,Sub-23,\n";
+  // BOM para que Excel abra bien los acentos
+  const blob = new Blob(["\uFEFF" + contenido], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "plantilla-corredores.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 /* ---------- UI ---------- */
 function escapeHtml(str) {
   return String(str == null ? "" : str)
@@ -550,6 +676,9 @@ function init() {
   ["#c-dorsal", "#c-nombre", "#c-categoria", "#c-equipo"].forEach((s) =>
     $(s).addEventListener("keydown", (e) => { if (e.key === "Enter") agregarCorredor(); }));
   $("#buscar-corredor").addEventListener("input", renderCorredores);
+  $("#btn-importar-csv").addEventListener("click", () => $("#file-csv").click());
+  $("#btn-plantilla-csv").addEventListener("click", descargarPlantillaCSV);
+  $("#file-csv").addEventListener("change", (e) => { if (e.target.files[0]) importarCSV(e.target.files[0]); e.target.value = ""; });
   $$("#tabla-corredores th[data-sort]").forEach((th) =>
     th.addEventListener("click", () => {
       const campo = th.dataset.sort;

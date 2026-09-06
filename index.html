@@ -64,6 +64,25 @@
       </div>
       <datalist id="cats"></datalist>
       <button class="btn primary" id="btn-add-corredor">Agregar corredor</button>
+
+      <hr />
+      <h3 class="sub-h">📥 Importar lista desde CSV</h3>
+      <p class="muted">
+        Subí un archivo <strong>.csv</strong> (o Excel guardado como CSV) con las columnas:
+        <code>dorsal, nombre, categoria, equipo</code>. La primera fila puede ser el encabezado.
+      </p>
+      <div class="btn-row">
+        <button class="btn" id="btn-importar-csv">📥 Subir CSV de corredores</button>
+        <button class="btn" id="btn-plantilla-csv">📄 Descargar plantilla</button>
+        <input type="file" id="file-csv" accept=".csv,text/csv" hidden />
+      </div>
+      <label class="inline" style="margin-top:10px">
+        <span style="display:flex;align-items:center;gap:6px;color:var(--texto)">
+          <input type="checkbox" id="csv-reemplazar" style="width:auto" />
+          Reemplazar la lista actual (si se deja sin marcar, se agregan al final)
+        </span>
+      </label>
+      <div id="csv-msg" class="muted"></div>
     </div>
 
     <div class="card">

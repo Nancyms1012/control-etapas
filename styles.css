@@ -37,6 +37,8 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .card h2 { margin-top: 0; font-size: 1.1rem; color: var(--azul-osc); }
+.sub-h { font-size: 0.98rem; color: var(--azul-osc); margin: 0 0 6px; }
+code { background: #eef2f7; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
 
 .card-head {
   display: flex;

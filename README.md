@@ -15,6 +15,10 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
   - **Por puntos** — se suman los puntos; gana el mayor puntaje. Admite un esquema de
     puntos por posición (ej: `25,20,16,13,...`) o puntos ingresados a mano.
 - **Corredores:** dorsal, nombre, categoría y equipo. Agregar, editar, eliminar, buscar y ordenar.
+  - **Importar desde CSV:** subí un archivo `.csv` (o un Excel guardado como CSV) con las
+    columnas `dorsal, nombre, categoria, equipo` para cargar decenas de corredores de una vez.
+    Detecta automáticamente el separador (`,`, `;` o tab) y si la primera fila es encabezado.
+    Podés **agregar** al final o **reemplazar** la lista. Hay una **plantilla descargable**.
 - **Etapas:** crear varias etapas (con nombre y fecha). Por cada etapa se registra el
   **tiempo o puntos** de cada corredor y su **estado**: OK, **DNF** (no finalizó),
   **DNS** (no salió), **DSQ** (descalificado). La posición de cada etapa se calcula sola.
