@@ -14,6 +14,15 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
   - **Por tiempo** — se suman los tiempos de cada etapa; gana el menor tiempo total.
   - **Por puntos** — se suman los puntos; gana el mayor puntaje. Admite un esquema de
     puntos por posición (ej: `25,20,16,13,...`) o puntos ingresados a mano.
+- **Cronómetro en la etapa (modo tiempo):** iniciás el crono al dar la salida y marcás la
+  llegada de cada corredor escribiendo su dorsal; el tiempo se guarda solo en su fila.
+- **Metas Volantes:** por etapa registrás quién ganó cada meta (1°, 2°, 3°...) y la app
+  genera la **clasificación general de metas volantes** (rey de las metas).
+- **Premios de Montaña:** por etapa agregás cada premio con su **categoría** y las posiciones,
+  y la app genera la **clasificación general de montaña** (rey de la montaña).
+- **Puntuación configurable:** tablas editables de puntos para Metas Volantes, Premios de
+  Montaña (por categoría) y Top 10 de etapa. Vienen con los valores de la Federación y se
+  pueden cambiar por evento.
 - **Corredores:** dorsal, nombre, categoría y equipo. Agregar, editar, eliminar, buscar y ordenar.
   - **Importar desde CSV:** subí un archivo `.csv` (o un Excel guardado como CSV) con las
     columnas `dorsal, nombre, categoria, equipo` para cargar decenas de corredores de una vez.

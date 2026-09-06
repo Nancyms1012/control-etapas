@@ -48,7 +48,10 @@
   <nav class="tabs no-print">
     <button class="tab-btn active" data-tab="corredores">Corredores</button>
     <button class="tab-btn" data-tab="etapas">Etapas</button>
-    <button class="tab-btn" data-tab="general">Clasificación general</button>
+    <button class="tab-btn" data-tab="general">General</button>
+    <button class="tab-btn" data-tab="metas">🟣 Metas Volantes</button>
+    <button class="tab-btn" data-tab="montana">🔴 Montaña</button>
+    <button class="tab-btn" data-tab="puntuacion">Puntuación</button>
     <button class="tab-btn" data-tab="respaldo">Respaldo</button>
   </nav>
 
@@ -130,6 +133,28 @@
         <h2 id="etapa-titulo">Etapa</h2>
         <p id="etapa-info" class="muted"></p>
       </div>
+
+      <!-- Cronómetro (solo modo tiempo) -->
+      <div id="crono-box" class="crono-box no-print">
+        <div class="crono-display" id="crono-display">0:00:00.0</div>
+        <div class="crono-controles">
+          <button class="btn primary" id="crono-start">▶️ Iniciar</button>
+          <button class="btn" id="crono-pausa">⏸️ Pausar</button>
+          <button class="btn danger" id="crono-reset">⏹️ Reiniciar</button>
+        </div>
+        <div class="crono-marcar">
+          <label>Marcar llegada por dorsal
+            <input type="number" id="crono-dorsal" placeholder="Dorsal" min="1" />
+          </label>
+          <button class="btn" id="crono-marcar-btn">🏁 Marcar tiempo</button>
+        </div>
+        <p class="muted" id="crono-ultimo"></p>
+        <details class="crono-ayuda">
+          <summary>¿Cómo funciona?</summary>
+          <p class="muted">Presioná <strong>Iniciar</strong> al dar la salida. Cuando cada corredor cruza la meta, escribí su dorsal y presioná <strong>Marcar tiempo</strong> (o Enter). El tiempo transcurrido se guarda automáticamente en su fila. Podés seguir editando los tiempos a mano abajo.</p>
+        </details>
+      </div>
+
       <div class="table-wrap">
         <table id="tabla-etapa">
           <thead>
@@ -171,6 +196,95 @@
         </table>
       </div>
       <button class="btn no-print" id="btn-imprimir-general">🖨️ Imprimir / PDF general</button>
+    </div>
+  </section>
+
+  <!-- TAB: Metas Volantes -->
+  <section class="tab-panel hidden" id="tab-metas">
+    <div class="card no-print">
+      <div class="etapa-toolbar">
+        <label>Etapa <select id="sel-etapa-mv"></select></label>
+        <button class="btn primary" id="btn-add-meta">+ Agregar meta volante</button>
+      </div>
+      <p class="muted">Por cada meta volante, seleccioná qué corredor llegó 1°, 2°, 3°. Los puntos se asignan solos (configurables en la pestaña Puntuación).</p>
+    </div>
+    <div class="card" id="mv-vacio"><p class="empty">No hay etapas. Creá una en la pestaña <strong>Etapas</strong>.</p></div>
+    <div id="mv-lista" class="lista-metas"></div>
+
+    <div class="card">
+      <div class="etapa-encabezado">
+        <h2>🟣 Clasificación general · Metas Volantes</h2>
+        <p class="muted">Rey de las metas volantes (acumulado de todas las etapas)</p>
+      </div>
+      <div class="table-wrap">
+        <table id="tabla-general-mv">
+          <thead><tr><th>Pos.</th><th>Dorsal</th><th>Nombre</th><th>Categoría</th><th>Equipo</th><th>Puntos MV</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn no-print" id="btn-imprimir-mv">🖨️ Imprimir / PDF</button>
+    </div>
+  </section>
+
+  <!-- TAB: Premios de Montaña -->
+  <section class="tab-panel hidden" id="tab-montana">
+    <div class="card no-print">
+      <div class="etapa-toolbar">
+        <label>Etapa <select id="sel-etapa-pm"></select></label>
+        <button class="btn primary" id="btn-add-premio">+ Agregar premio de montaña</button>
+      </div>
+      <p class="muted">Por cada premio elegí su categoría y qué corredor pasó en cada posición. Los puntos dependen de la categoría (configurables en Puntuación).</p>
+    </div>
+    <div class="card" id="pm-vacio"><p class="empty">No hay etapas. Creá una en la pestaña <strong>Etapas</strong>.</p></div>
+    <div id="pm-lista" class="lista-metas"></div>
+
+    <div class="card">
+      <div class="etapa-encabezado">
+        <h2>🔴 Clasificación general · Premios de Montaña</h2>
+        <p class="muted">Rey de la montaña (acumulado de todas las etapas)</p>
+      </div>
+      <div class="table-wrap">
+        <table id="tabla-general-pm">
+          <thead><tr><th>Pos.</th><th>Dorsal</th><th>Nombre</th><th>Categoría</th><th>Equipo</th><th>Puntos Montaña</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn no-print" id="btn-imprimir-pm">🖨️ Imprimir / PDF</button>
+    </div>
+  </section>
+
+  <!-- TAB: Puntuación -->
+  <section class="tab-panel hidden" id="tab-puntuacion">
+    <div class="card no-print">
+      <h2>Tablas de puntos</h2>
+      <p class="muted">Estos son los puntos que reparte cada posición. Se guardan con el evento; podés cambiarlos para el próximo.</p>
+      <button class="btn danger" id="btn-pts-restaurar">↺ Restaurar valores por defecto</button>
+    </div>
+
+    <div class="puntuacion-grid">
+      <div class="card">
+        <h3 class="sub-h">🟣 Metas Volantes</h3>
+        <table class="tabla-pts" id="tabla-pts-mv">
+          <thead><tr><th>Pos.</th><th>Puntos</th><th class="no-print"></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="btn small no-print" id="btn-pts-mv-add">+ posición</button>
+      </div>
+
+      <div class="card">
+        <h3 class="sub-h">🏁 Puntos Top 10 (meta de etapa)</h3>
+        <table class="tabla-pts" id="tabla-pts-top">
+          <thead><tr><th>Pos.</th><th>Puntos</th><th class="no-print"></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="btn small no-print" id="btn-pts-top-add">+ posición</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="sub-h">🔴 Premios de Montaña (por categoría)</h3>
+      <div id="montana-cats" class="puntuacion-grid"></div>
+      <button class="btn small no-print" id="btn-pts-montana-add">+ agregar categoría</button>
     </div>
   </section>
 

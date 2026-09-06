@@ -6,11 +6,31 @@
 const STORAGE_KEY = "controlEtapas_v1";
 
 /* ---------- Estado ---------- */
+// Tablas de puntos por defecto (según las planillas de la Federación).
+const PUNTUACION_DEFECTO = {
+  // Metas volantes: posición -> puntos
+  metasVolantes: { 1: 5, 2: 3, 3: 1 },
+  // Top 10 de etapa: posición -> puntos
+  top10: { 1: 15, 2: 12, 3: 10, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+  // Premios de montaña: por categoría -> { posición: puntos }
+  montana: {
+    1: { 1: 4, 2: 2, 3: 1 },
+    2: { 1: 4, 2: 2, 3: 1 },
+    3: { 1: 6, 2: 3, 3: 2, 4: 2, 5: 1 },
+    4: { 1: 4, 2: 2, 3: 1 }
+  }
+};
+
 let estado = {
   evento: { nombre: "", organiza: "", comisario: "", tipo: "tiempo", esquemaPuntos: "" },
+  puntuacion: JSON.parse(JSON.stringify(PUNTUACION_DEFECTO)),
   corredores: [], // { id, dorsal, nombre, categoria, equipo }
-  etapas: [],     // { id, numero, nombre, fecha, resultados: { [corredorId]: { estado, tiempo, puntos, posicion } } }
-  seleccion: { etapaId: null }
+  // etapa: { id, numero, nombre, fecha, salida, recorrido, km,
+  //          resultados: { [corredorId]: { estado, tiempo, puntos } },
+  //          metas: [ { id, nombre, ganadores: { pos -> corredorId } } ],
+  //          montana: [ { id, nombre, categoria, ganadores: { pos -> corredorId } } ] }
+  etapas: [],
+  seleccion: { etapaId: null, etapaMV: null, etapaPM: null }
 };
 
 /* ---------- Utilidades ---------- */
@@ -30,6 +50,22 @@ function cargar() {
       estado = Object.assign(estado, data);
     } catch (e) { console.warn("No se pudo cargar", e); }
   }
+  migrar();
+}
+
+// Rellena campos que puedan faltar en datos guardados antes de esta versión.
+function migrar() {
+  if (!estado.puntuacion) estado.puntuacion = JSON.parse(JSON.stringify(PUNTUACION_DEFECTO));
+  ["metasVolantes", "top10"].forEach((k) => { if (!estado.puntuacion[k]) estado.puntuacion[k] = {}; });
+  if (!estado.puntuacion.montana) estado.puntuacion.montana = {};
+  if (!estado.seleccion) estado.seleccion = {};
+  (estado.etapas || []).forEach((e) => {
+    if (!e.metas) e.metas = [];
+    if (!e.montana) e.montana = [];
+    if (e.salida === undefined) e.salida = "";
+    if (e.recorrido === undefined) e.recorrido = "";
+    if (e.km === undefined) e.km = "";
+  });
 }
 let saveTimer;
 function marcarGuardado() {
@@ -266,6 +302,10 @@ function renderEtapa() {
     (tipo === "tiempo" ? "Clasificación por tiempo" : "Clasificación por puntos");
   $("#th-resultado").textContent = tipo === "tiempo" ? "Tiempo (h:mm:ss)" : "Puntos";
 
+  // El cronómetro solo tiene sentido cuando se clasifica por tiempo
+  const cronoBox = $("#crono-box");
+  if (cronoBox) cronoBox.classList.toggle("hidden", tipo !== "tiempo");
+
   const posiciones = calcularPosicionesEtapa(e);
   const tbody = $("#tabla-etapa tbody");
   tbody.innerHTML = "";
@@ -438,6 +478,102 @@ function renderGeneral() {
   });
 }
 
+/* ---------- Cronómetro ---------- */
+const crono = { inicio: 0, acumulado: 0, corriendo: false, raf: null };
+
+function cronoFormato(ms) {
+  const totalSeg = ms / 1000;
+  const h = Math.floor(totalSeg / 3600);
+  const m = Math.floor((totalSeg % 3600) / 60);
+  const s = Math.floor(totalSeg % 60);
+  const d = Math.floor((ms % 1000) / 100); // décimas
+  const mm = (m < 10 ? "0" : "") + m;
+  const ss = (s < 10 ? "0" : "") + s;
+  return `${h}:${mm}:${ss}.${d}`;
+}
+
+function cronoTranscurrido() {
+  return crono.acumulado + (crono.corriendo ? (performance.now() - crono.inicio) : 0);
+}
+
+function cronoTick() {
+  $("#crono-display").textContent = cronoFormato(cronoTranscurrido());
+  if (crono.corriendo) crono.raf = requestAnimationFrame(cronoTick);
+}
+
+function cronoStart() {
+  if (crono.corriendo) return;
+  crono.inicio = performance.now();
+  crono.corriendo = true;
+  $("#crono-display").classList.add("corriendo");
+  cronoTick();
+}
+function cronoPausa() {
+  if (!crono.corriendo) return;
+  crono.acumulado = cronoTranscurrido();
+  crono.corriendo = false;
+  cancelAnimationFrame(crono.raf);
+  $("#crono-display").classList.remove("corriendo");
+  $("#crono-display").textContent = cronoFormato(crono.acumulado);
+}
+function cronoReset() {
+  if (crono.corriendo || crono.acumulado > 0) {
+    if (!confirm("¿Reiniciar el cronómetro a cero?")) return;
+  }
+  crono.corriendo = false;
+  cancelAnimationFrame(crono.raf);
+  crono.acumulado = 0;
+  crono.inicio = 0;
+  $("#crono-display").classList.remove("corriendo");
+  $("#crono-display").textContent = cronoFormato(0);
+  $("#crono-ultimo").textContent = "";
+}
+
+function cronoMarcar() {
+  const e = etapaActual();
+  if (!e) return;
+  if (!crono.corriendo && crono.acumulado === 0) {
+    alert("Primero iniciá el cronómetro (▶️ Iniciar).");
+    return;
+  }
+  const dorsalInput = $("#crono-dorsal");
+  const dorsal = dorsalInput.value.trim();
+  if (!dorsal) { alert("Escribí el dorsal del corredor que llegó."); dorsalInput.focus(); return; }
+
+  const c = estado.corredores.find((x) => String(x.dorsal) === String(dorsal));
+  if (!c) { alert(`No hay ningún corredor con el dorsal ${dorsal}.`); dorsalInput.select(); return; }
+
+  const ms = cronoTranscurrido();
+  const r = resultadoDe(e, c.id);
+  const tiempoStr = segundosATiempoCrono(ms / 1000);
+
+  if (r.tiempo) {
+    if (!confirm(`${c.nombre} (dorsal ${dorsal}) ya tenía el tiempo ${r.tiempo}. ¿Reemplazar por ${tiempoStr}?`)) return;
+  }
+  r.tiempo = tiempoStr;
+  r.estado = "ok";
+  guardar();
+
+  $("#crono-ultimo").textContent = `✓ ${c.nombre} (dorsal ${dorsal}) → ${tiempoStr}`;
+  dorsalInput.value = "";
+  dorsalInput.focus();
+  renderEtapa();
+
+  // destello en la fila marcada
+  const fila = document.querySelector(`#tabla-etapa [data-tiempo="${c.id}"]`);
+  if (fila) { const tr = fila.closest("tr"); if (tr) { tr.classList.add("fila-marcada"); setTimeout(() => tr.classList.remove("fila-marcada"), 1000); } }
+}
+
+// Formato de tiempo desde el crono con décimas (h:mm:ss.d)
+function segundosATiempoCrono(seg) {
+  const h = Math.floor(seg / 3600);
+  const m = Math.floor((seg % 3600) / 60);
+  const s = seg % 60;
+  const mm = (m < 10 ? "0" : "") + m;
+  const ss = (s < 10 ? "0" : "") + s.toFixed(1);
+  return `${h}:${mm}:${ss}`;
+}
+
 /* ---------- Impresión ---------- */
 function prepararEncabezadoImpresion(subtitulo) {
   const ev = estado.evento;
@@ -480,6 +616,7 @@ function importar(file) {
       if (!data.corredores || !data.etapas) throw new Error("Formato no válido");
       if (!confirm("Esto reemplazará todos los datos de este dispositivo. ¿Continuar?")) return;
       estado = Object.assign({ evento: {}, corredores: [], etapas: [], seleccion: {} }, data);
+      migrar();
       guardar();
       cargarConfigEnUI();
       renderTodo();
@@ -622,6 +759,360 @@ function descargarPlantillaCSV() {
   URL.revokeObjectURL(a.href);
 }
 
+/* ================================================================
+   PUNTUACIÓN (tablas configurables)
+   ================================================================ */
+function objABuffer(obj) {
+  // convierte {1:5,2:3} en filas ordenadas [{pos:1,pts:5},...]
+  return Object.keys(obj).map((k) => ({ pos: +k, pts: obj[k] }))
+    .sort((a, b) => a.pos - b.pos);
+}
+
+function renderPuntuacion() {
+  const p = estado.puntuacion;
+
+  // Metas volantes
+  renderTablaSimple("#tabla-pts-mv tbody", p.metasVolantes, "mv");
+  // Top 10
+  renderTablaSimple("#tabla-pts-top tbody", p.top10, "top");
+
+  // Montaña: una tabla por categoría
+  const cont = $("#montana-cats");
+  cont.innerHTML = "";
+  Object.keys(p.montana).sort((a, b) => +a - +b).forEach((cat) => {
+    const div = document.createElement("div");
+    div.className = "mini-tabla";
+    let filas = objABuffer(p.montana[cat]).map((r) => `
+      <tr>
+        <td>${r.pos}</td>
+        <td><input type="number" step="any" value="${r.pts}" data-pm-cat="${cat}" data-pm-pos="${r.pos}" /></td>
+        <td class="no-print"><span class="link-action" data-pm-del="${cat}:${r.pos}">🗑️</span></td>
+      </tr>`).join("");
+    div.innerHTML = `
+      <h4>Categoría ${cat}</h4>
+      <table class="tabla-pts">
+        <thead><tr><th>Pos.</th><th>Puntos</th><th class="no-print"></th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      <div class="btn-row no-print">
+        <button class="btn small" data-pm-addpos="${cat}">+ posición</button>
+        <button class="btn small danger" data-pm-delcat="${cat}">Eliminar categoría ${cat}</button>
+      </div>`;
+    cont.appendChild(div);
+  });
+
+  // listeners montaña
+  cont.querySelectorAll("[data-pm-cat]").forEach((el) =>
+    el.addEventListener("change", () => {
+      estado.puntuacion.montana[el.dataset.pmCat][el.dataset.pmPos] = parseFloat(el.value) || 0;
+      guardar(); renderMV_PM();
+    }));
+  cont.querySelectorAll("[data-pm-del]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const [cat, pos] = el.dataset.pmDel.split(":");
+      delete estado.puntuacion.montana[cat][pos];
+      guardar(); renderPuntuacion(); renderMV_PM();
+    }));
+  cont.querySelectorAll("[data-pm-addpos]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const cat = el.dataset.pmAddpos;
+      const posiciones = Object.keys(estado.puntuacion.montana[cat]).map(Number);
+      const nueva = (posiciones.length ? Math.max(...posiciones) : 0) + 1;
+      estado.puntuacion.montana[cat][nueva] = 0;
+      guardar(); renderPuntuacion();
+    }));
+  cont.querySelectorAll("[data-pm-delcat]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const cat = el.dataset.pmDelcat;
+      if (!confirm(`¿Eliminar la categoría de montaña ${cat} y sus puntos?`)) return;
+      delete estado.puntuacion.montana[cat];
+      guardar(); renderPuntuacion(); renderMV_PM();
+    }));
+}
+
+function renderTablaSimple(sel, obj, tipo) {
+  const tbody = $(sel);
+  tbody.innerHTML = objABuffer(obj).map((r) => `
+    <tr>
+      <td>${r.pos}</td>
+      <td><input type="number" step="any" value="${r.pts}" data-${tipo}-pos="${r.pos}" /></td>
+      <td class="no-print"><span class="link-action" data-${tipo}-del="${r.pos}">🗑️</span></td>
+    </tr>`).join("");
+
+  const objetivo = tipo === "mv" ? estado.puntuacion.metasVolantes : estado.puntuacion.top10;
+  tbody.querySelectorAll(`[data-${tipo}-pos]`).forEach((el) =>
+    el.addEventListener("change", () => {
+      objetivo[el.dataset[tipo + "Pos"]] = parseFloat(el.value) || 0;
+      guardar(); renderMV_PM();
+    }));
+  tbody.querySelectorAll(`[data-${tipo}-del]`).forEach((el) =>
+    el.addEventListener("click", () => {
+      delete objetivo[el.dataset[tipo + "Del"]];
+      guardar(); renderPuntuacion(); renderMV_PM();
+    }));
+}
+
+function agregarPosicionSimple(cual) {
+  const obj = cual === "mv" ? estado.puntuacion.metasVolantes : estado.puntuacion.top10;
+  const posiciones = Object.keys(obj).map(Number);
+  const nueva = (posiciones.length ? Math.max(...posiciones) : 0) + 1;
+  obj[nueva] = 0;
+  guardar(); renderPuntuacion();
+}
+
+function agregarCategoriaMontana() {
+  const cat = prompt("Número/nombre de la categoría (ej: 1, 2, 3, 4):");
+  if (!cat) return;
+  if (estado.puntuacion.montana[cat]) { alert("Esa categoría ya existe."); return; }
+  estado.puntuacion.montana[cat] = { 1: 4, 2: 2, 3: 1 };
+  guardar(); renderPuntuacion(); renderMV_PM();
+}
+
+function restaurarPuntuacion() {
+  if (!confirm("¿Restaurar las tablas de puntos a los valores por defecto?")) return;
+  estado.puntuacion = JSON.parse(JSON.stringify(PUNTUACION_DEFECTO));
+  guardar(); renderPuntuacion(); renderMV_PM();
+}
+
+/* ================================================================
+   METAS VOLANTES y PREMIOS DE MONTAÑA (registro por etapa)
+   ================================================================ */
+function opcionesCorredores(seleccionado) {
+  const ops = estado.corredores.slice()
+    .sort((a, b) => (parseFloat(a.dorsal) || 1e9) - (parseFloat(b.dorsal) || 1e9))
+    .map((c) => `<option value="${c.id}" ${c.id === seleccionado ? "selected" : ""}>${escapeHtml((c.dorsal ? c.dorsal + " · " : "") + c.nombre)}</option>`)
+    .join("");
+  return `<option value="">— sin asignar —</option>` + ops;
+}
+
+/* ---- Metas Volantes ---- */
+function etapaMVActual() { return etapaPorId(estado.seleccion.etapaMV); }
+
+function renderMetasVolantes() {
+  const sel = $("#sel-etapa-mv");
+  sel.innerHTML = estado.etapas.map((e) =>
+    `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`).join("");
+  if (!estado.seleccion.etapaMV && estado.etapas.length) estado.seleccion.etapaMV = estado.etapas[0].id;
+  if (estado.seleccion.etapaMV) sel.value = estado.seleccion.etapaMV;
+
+  const e = etapaMVActual();
+  const cont = $("#mv-lista");
+  const vacio = $("#mv-vacio");
+  if (!e) { cont.innerHTML = ""; vacio.classList.remove("hidden"); return; }
+  vacio.classList.add("hidden");
+
+  const posMV = Object.keys(estado.puntuacion.metasVolantes).map(Number).sort((a, b) => a - b);
+
+  cont.innerHTML = e.metas.map((m) => {
+    const filas = posMV.map((pos) => {
+      const pts = estado.puntuacion.metasVolantes[pos];
+      return `<tr>
+        <td>${pos}°</td>
+        <td><select data-mv-gan="${m.id}:${pos}">${opcionesCorredores(m.ganadores[pos] || "")}</select></td>
+        <td>${pts} pts</td>
+      </tr>`;
+    }).join("");
+    return `
+      <div class="mini-tabla">
+        <div class="meta-head">
+          <input type="text" class="meta-nombre" value="${escapeHtml(m.nombre)}" placeholder="Nombre/ubicación (ej: Rest. California Km 25)" data-mv-nombre="${m.id}" />
+          <span class="link-action no-print" data-mv-del="${m.id}">🗑️</span>
+        </div>
+        <table class="tabla-pts">
+          <thead><tr><th>Pos.</th><th>Corredor</th><th>Puntos</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+  }).join("");
+
+  cont.querySelectorAll("[data-mv-nombre]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const m = e.metas.find((x) => x.id === el.dataset.mvNombre);
+      if (m) { m.nombre = el.value; guardar(); }
+    }));
+  cont.querySelectorAll("[data-mv-gan]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [mid, pos] = el.dataset.mvGan.split(":");
+      const m = e.metas.find((x) => x.id === mid);
+      if (m) { if (el.value) m.ganadores[pos] = el.value; else delete m.ganadores[pos]; guardar(); renderGeneralMV(); }
+    }));
+  cont.querySelectorAll("[data-mv-del]").forEach((el) =>
+    el.addEventListener("click", () => {
+      if (!confirm("¿Eliminar esta meta volante?")) return;
+      e.metas = e.metas.filter((x) => x.id !== el.dataset.mvDel);
+      guardar(); renderMetasVolantes(); renderGeneralMV();
+    }));
+
+  renderGeneralMV();
+}
+
+function agregarMetaVolante() {
+  const e = etapaMVActual();
+  if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
+  e.metas.push({ id: uid(), nombre: "", ganadores: {} });
+  guardar(); renderMetasVolantes();
+}
+
+function calcularGeneralMV() {
+  const puntos = {}; // corredorId -> total
+  estado.etapas.forEach((e) => {
+    (e.metas || []).forEach((m) => {
+      Object.keys(m.ganadores).forEach((pos) => {
+        const cid = m.ganadores[pos];
+        const pts = estado.puntuacion.metasVolantes[pos] || 0;
+        if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+      });
+    });
+  });
+  return estado.corredores
+    .map((c) => ({ corredor: c, total: puntos[c.id] || 0 }))
+    .filter((f) => f.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+function renderGeneralMV() {
+  const filas = calcularGeneralMV();
+  const tbody = $("#tabla-general-mv tbody");
+  tbody.innerHTML = filas.map((f, i) => {
+    const c = f.corredor;
+    return `<tr class="${i < 3 ? "pos-" + (i + 1) : ""}">
+      <td>${i + 1}</td>
+      <td>${escapeHtml(c.dorsal)}</td>
+      <td>${escapeHtml(c.nombre)}</td>
+      <td>${escapeHtml(c.categoria)}</td>
+      <td>${escapeHtml(c.equipo)}</td>
+      <td>${f.total}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">Aún no hay puntos registrados.</td></tr>`;
+}
+
+/* ---- Premios de Montaña ---- */
+function etapaPMActual() { return etapaPorId(estado.seleccion.etapaPM); }
+
+function renderPremiosMontana() {
+  const sel = $("#sel-etapa-pm");
+  sel.innerHTML = estado.etapas.map((e) =>
+    `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`).join("");
+  if (!estado.seleccion.etapaPM && estado.etapas.length) estado.seleccion.etapaPM = estado.etapas[0].id;
+  if (estado.seleccion.etapaPM) sel.value = estado.seleccion.etapaPM;
+
+  const e = etapaPMActual();
+  const cont = $("#pm-lista");
+  const vacio = $("#pm-vacio");
+  if (!e) { cont.innerHTML = ""; vacio.classList.remove("hidden"); return; }
+  vacio.classList.add("hidden");
+
+  const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+
+  cont.innerHTML = e.montana.map((pm) => {
+    const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
+    const posiciones = Object.keys(tablaCat).map(Number).sort((a, b) => a - b);
+    const filas = posiciones.map((pos) => `
+      <tr>
+        <td>${pos}°</td>
+        <td><select data-pm-gan="${pm.id}:${pos}">${opcionesCorredores(pm.ganadores[pos] || "")}</select></td>
+        <td>${tablaCat[pos]} pts</td>
+      </tr>`).join("") || `<tr><td colspan="3" class="muted">Esta categoría no tiene puntos configurados.</td></tr>`;
+    const opsCat = cats.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
+    return `
+      <div class="mini-tabla">
+        <div class="meta-head">
+          <input type="text" class="meta-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Nombre/ubicación (ej: Bahía Carey Km 63)" data-pm-nombre="${pm.id}" />
+          <select class="pm-cat-sel" data-pm-cat="${pm.id}">${opsCat}</select>
+          <span class="link-action no-print" data-pm-del="${pm.id}">🗑️</span>
+        </div>
+        <table class="tabla-pts">
+          <thead><tr><th>Pos.</th><th>Corredor</th><th>Puntos</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+  }).join("");
+
+  cont.querySelectorAll("[data-pm-nombre]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const pm = e.montana.find((x) => x.id === el.dataset.pmNombre);
+      if (pm) { pm.nombre = el.value; guardar(); }
+    }));
+  cont.querySelectorAll("[data-pm-cat]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const pm = e.montana.find((x) => x.id === el.dataset.pmCat);
+      if (pm) { pm.categoria = el.value; pm.ganadores = {}; guardar(); renderPremiosMontana(); renderGeneralPM(); }
+    }));
+  cont.querySelectorAll("[data-pm-gan]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [pmid, pos] = el.dataset.pmGan.split(":");
+      const pm = e.montana.find((x) => x.id === pmid);
+      if (pm) { if (el.value) pm.ganadores[pos] = el.value; else delete pm.ganadores[pos]; guardar(); renderGeneralPM(); }
+    }));
+  cont.querySelectorAll("[data-pm-del]").forEach((el) =>
+    el.addEventListener("click", () => {
+      if (!confirm("¿Eliminar este premio de montaña?")) return;
+      e.montana = e.montana.filter((x) => x.id !== el.dataset.pmDel);
+      guardar(); renderPremiosMontana(); renderGeneralPM();
+    }));
+
+  renderGeneralPM();
+}
+
+function agregarPremioMontana() {
+  const e = etapaPMActual();
+  if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
+  const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+  if (!cats.length) { alert("Primero configurá al menos una categoría de montaña en la pestaña Puntuación."); return; }
+  e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadores: {} });
+  guardar(); renderPremiosMontana();
+}
+
+function calcularGeneralPM() {
+  const puntos = {};
+  estado.etapas.forEach((e) => {
+    (e.montana || []).forEach((pm) => {
+      const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
+      Object.keys(pm.ganadores).forEach((pos) => {
+        const cid = pm.ganadores[pos];
+        const pts = tablaCat[pos] || 0;
+        if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+      });
+    });
+  });
+  return estado.corredores
+    .map((c) => ({ corredor: c, total: puntos[c.id] || 0 }))
+    .filter((f) => f.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+function renderGeneralPM() {
+  const filas = calcularGeneralPM();
+  const tbody = $("#tabla-general-pm tbody");
+  tbody.innerHTML = filas.map((f, i) => {
+    const c = f.corredor;
+    return `<tr class="${i < 3 ? "pos-" + (i + 1) : ""}">
+      <td>${i + 1}</td>
+      <td>${escapeHtml(c.dorsal)}</td>
+      <td>${escapeHtml(c.nombre)}</td>
+      <td>${escapeHtml(c.categoria)}</td>
+      <td>${escapeHtml(c.equipo)}</td>
+      <td>${f.total}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">Aún no hay puntos registrados.</td></tr>`;
+}
+
+function renderMV_PM() {
+  renderMetasVolantes();
+  renderPremiosMontana();
+}
+
+function imprimirGeneralMV() {
+  mostrarSoloTab("metas");
+  prepararEncabezadoImpresion("Clasificación general · Metas Volantes");
+  window.print();
+}
+function imprimirGeneralPM() {
+  mostrarSoloTab("montana");
+  prepararEncabezadoImpresion("Clasificación general · Premios de Montaña");
+  window.print();
+}
+
 /* ---------- UI ---------- */
 function escapeHtml(str) {
   return String(str == null ? "" : str)
@@ -648,6 +1139,8 @@ function renderTodo() {
   renderCorredores();
   renderEtapa();
   renderGeneral();
+  renderPuntuacion();
+  renderMV_PM();
   actualizarDatalistCategorias();
 }
 
@@ -694,9 +1187,32 @@ function init() {
   $("#sel-etapa").addEventListener("change", (e) => { estado.seleccion.etapaId = e.target.value; guardar(); renderEtapa(); });
   $("#btn-imprimir-etapa").addEventListener("click", imprimirEtapa);
 
+  // Cronómetro
+  $("#crono-start").addEventListener("click", cronoStart);
+  $("#crono-pausa").addEventListener("click", cronoPausa);
+  $("#crono-reset").addEventListener("click", cronoReset);
+  $("#crono-marcar-btn").addEventListener("click", cronoMarcar);
+  $("#crono-dorsal").addEventListener("keydown", (e) => { if (e.key === "Enter") cronoMarcar(); });
+
   // General
   $("#filtro-categoria").addEventListener("change", renderGeneral);
   $("#btn-imprimir-general").addEventListener("click", imprimirGeneral);
+
+  // Puntuación
+  $("#btn-pts-mv-add").addEventListener("click", () => agregarPosicionSimple("mv"));
+  $("#btn-pts-top-add").addEventListener("click", () => agregarPosicionSimple("top"));
+  $("#btn-pts-montana-add").addEventListener("click", agregarCategoriaMontana);
+  $("#btn-pts-restaurar").addEventListener("click", restaurarPuntuacion);
+
+  // Metas Volantes
+  $("#sel-etapa-mv").addEventListener("change", (e) => { estado.seleccion.etapaMV = e.target.value; guardar(); renderMetasVolantes(); });
+  $("#btn-add-meta").addEventListener("click", agregarMetaVolante);
+  $("#btn-imprimir-mv").addEventListener("click", imprimirGeneralMV);
+
+  // Premios de Montaña
+  $("#sel-etapa-pm").addEventListener("change", (e) => { estado.seleccion.etapaPM = e.target.value; guardar(); renderPremiosMontana(); });
+  $("#btn-add-premio").addEventListener("click", agregarPremioMontana);
+  $("#btn-imprimir-pm").addEventListener("click", imprimirGeneralPM);
 
   // Respaldo
   $("#btn-exportar").addEventListener("click", exportar);
