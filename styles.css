@@ -206,6 +206,13 @@ hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
 .corredor-info.ok { color: var(--texto); font-weight: 600; }
 .corredor-info.error { color: var(--rojo); }
 .corredor-info.muted { color: var(--muted); }
+
+/* Bloques por categoría de corredor (Opción B) */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 6px; }
+.cat-bloque { border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px 10px; background: #fafbfd; }
+.cat-titulo { margin: 0 0 6px; font-size: 0.9rem; color: var(--azul); background: #eef4fb; padding: 3px 8px; border-radius: 5px; }
+.pm-cat-label { flex-direction: row; align-items: center; gap: 6px; font-size: 0.8rem; }
+.pm-cat-label select { width: auto; }
 .fila-marcada { animation: destello 1s ease; }
 @keyframes destello { from { background: #d9f0e2; } to { background: transparent; } }
 

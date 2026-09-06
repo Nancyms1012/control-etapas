@@ -16,13 +16,14 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
     puntos por posición (ej: `25,20,16,13,...`) o puntos ingresados a mano.
 - **Cronómetro en la etapa (modo tiempo):** iniciás el crono al dar la salida y marcás la
   llegada de cada corredor escribiendo su dorsal; el tiempo se guarda solo en su fila.
-- **Metas Volantes:** por etapa registrás quién ganó cada meta ingresando su **dorsal**
-  (la app muestra automáticamente el nombre y equipo). Genera la **clasificación general de
-  metas volantes** (rey de las metas), con **filtro por categoría de corredor** para eventos
-  con varias categorías.
-- **Premios de Montaña:** por etapa agregás cada premio con su **categoría de premio** y las
-  posiciones (por dorsal). Genera la **clasificación general de montaña** (rey de la montaña),
-  también con **filtro por categoría de corredor**.
+- **Metas Volantes (por categoría):** por etapa agregás cada meta y registrás las posiciones
+  **por cada categoría de corredor** (cada categoría reparte sus propios puntos, ej. 5/3/1). Se
+  ingresa por **dorsal** y la app muestra el nombre/equipo y **valida que el corredor sea de esa
+  categoría** (avisa si no lo es). Las categorías se detectan solas según los corredores inscritos.
+  Genera la **clasificación general de metas volantes** (rey de las metas) con filtro por categoría.
+- **Premios de Montaña (por categoría):** igual que las metas, pero cada premio tiene además su
+  **categoría de premio** (1/2/3/4) que define cuántos puntos reparte. Dentro, se registra por cada
+  categoría de corredor. Genera la **clasificación general de montaña** (rey de la montaña) con filtro.
 - **Puntuación configurable:** tablas editables de puntos para Metas Volantes, Premios de
   Montaña (por categoría) y Top 10 de etapa. Vienen con los valores de la Federación y se
   pueden cambiar por evento.

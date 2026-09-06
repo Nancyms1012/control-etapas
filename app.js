@@ -65,7 +65,28 @@ function migrar() {
     if (e.salida === undefined) e.salida = "";
     if (e.recorrido === undefined) e.recorrido = "";
     if (e.km === undefined) e.km = "";
+    // Migración a Opción B: convertir ganadores {pos:id} en ganadoresPorCat {categoria:{pos:id}}
+    e.metas.forEach((m) => migrarGanadores(m));
+    e.montana.forEach((pm) => migrarGanadores(pm));
   });
+}
+
+// Convierte el formato viejo (ganadores por orden general) al nuevo (por categoría de corredor).
+function migrarGanadores(item) {
+  if (!item.ganadoresPorCat) item.ganadoresPorCat = {};
+  if (item.ganadores && Object.keys(item.ganadores).length) {
+    Object.keys(item.ganadores).forEach((pos) => {
+      const cid = item.ganadores[pos];
+      const c = corredorPorId(cid);
+      const cat = c ? (c.categoria || "").trim() : "";
+      if (cat) {
+        if (!item.ganadoresPorCat[cat]) item.ganadoresPorCat[cat] = {};
+        // no piso una asignación existente de la misma posición/categoría
+        if (!item.ganadoresPorCat[cat][pos]) item.ganadoresPorCat[cat][pos] = cid;
+      }
+    });
+  }
+  delete item.ganadores; // ya no se usa
 }
 let saveTimer;
 function marcarGuardado() {
@@ -926,31 +947,49 @@ function corredorPorDorsal(dorsal) {
   return estado.corredores.find((c) => String(c.dorsal).trim() === d) || null;
 }
 
-// Celda de entrada por dorsal: input + info del corredor (nombre/equipo) que la app "jala".
-// tipoData: "mv" o "pm"; ref: id de la meta/premio; pos: posición.
-function celdaDorsal(tipoData, ref, pos, corredorId) {
-  const c = corredorId ? corredorPorId(corredorId) : null;
-  const dorsalVal = c ? escapeHtml(c.dorsal) : "";
-  const info = c
-    ? `<span class="corredor-info ok">${escapeHtml(c.nombre)}${c.equipo ? " · " + escapeHtml(c.equipo) : ""}</span>`
-    : (corredorId ? `<span class="corredor-info error">⚠️ dorsal no encontrado</span>` : `<span class="corredor-info muted">—</span>`);
-  return `
-    <td><input type="number" class="dorsal-input" min="1" placeholder="Dorsal"
-        value="${dorsalVal}" data-${tipoData}-gan="${ref}:${pos}" /></td>
-    <td class="corredor-cel" data-${tipoData}-info="${ref}:${pos}">${info}</td>`;
+// Lista ordenada de las categorías de corredor presentes en la inscripción.
+function categoriasCorredores() {
+  return [...new Set(estado.corredores.map((c) => (c.categoria || "").trim()).filter(Boolean))].sort();
 }
 
-// Actualiza la celda de info (nombre/equipo) sin re-renderizar toda la tabla,
-// para no perder el foco mientras se escribe el dorsal.
-function actualizarInfoDorsal(tipoData, clave, dorsal) {
-  const cel = document.querySelector(`[data-${tipoData}-info="${clave}"]`);
+// HTML de la info del corredor según su dorsal, validando que pertenezca a la categoría esperada.
+function infoDorsalHTML(corredorId, dorsal, categoriaEsperada) {
+  const d = String(dorsal == null ? "" : dorsal).trim();
+  if (!d && !corredorId) return `<span class="corredor-info muted">—</span>`;
+  const c = corredorId ? corredorPorId(corredorId) : corredorPorDorsal(d);
+  if (!c) return `<span class="corredor-info error">⚠️ dorsal no encontrado</span>`;
+  const cat = (c.categoria || "").trim();
+  if (categoriaEsperada && cat !== categoriaEsperada) {
+    return `<span class="corredor-info error">⚠️ ${escapeHtml(c.nombre)} es de ${escapeHtml(cat || "sin categoría")}, no de ${escapeHtml(categoriaEsperada)}</span>`;
+  }
+  return `<span class="corredor-info ok">${escapeHtml(c.nombre)}${c.equipo ? " · " + escapeHtml(c.equipo) : ""}</span>`;
+}
+
+// Celda de entrada por dorsal (Opción B): valida contra la categoría del bloque.
+// tipoData: "mv" o "pm"; clave: identificador único del campo; corredorId guardado; catEsperada.
+function celdaDorsal(tipoData, clave, corredorId, catEsperada) {
+  const c = corredorId ? corredorPorId(corredorId) : null;
+  const dorsalVal = c ? escapeHtml(c.dorsal) : "";
+  return `
+    <td><input type="number" class="dorsal-input" min="1" placeholder="Dorsal"
+        value="${dorsalVal}" data-${tipoData}-gan="${clave}" /></td>
+    <td class="corredor-cel" data-${tipoData}-info="${clave}">${infoDorsalHTML(corredorId, dorsalVal, catEsperada)}</td>`;
+}
+
+// Actualiza la celda de info sin re-renderizar toda la tabla (para no perder el foco).
+function actualizarInfoDorsal(tipoData, clave, dorsal, catEsperada) {
+  const cel = document.querySelector(`[data-${tipoData}-info="${CSS.escape(clave)}"]`);
   if (!cel) return;
-  const d = String(dorsal).trim();
-  if (!d) { cel.innerHTML = `<span class="corredor-info muted">—</span>`; return; }
-  const c = corredorPorDorsal(d);
-  cel.innerHTML = c
-    ? `<span class="corredor-info ok">${escapeHtml(c.nombre)}${c.equipo ? " · " + escapeHtml(c.equipo) : ""}</span>`
-    : `<span class="corredor-info error">⚠️ dorsal no encontrado</span>`;
+  cel.innerHTML = infoDorsalHTML(null, dorsal, catEsperada);
+}
+
+// Devuelve el corredor válido para asignar en un bloque de categoría, o null.
+// Si el dorsal existe pero es de otra categoría, NO lo asigna (retorna null).
+function resolverDorsalEnCategoria(dorsal, catEsperada) {
+  const c = corredorPorDorsal(dorsal);
+  if (!c) return null;
+  if (catEsperada && (c.categoria || "").trim() !== catEsperada) return null;
+  return c;
 }
 
 /* ---- Metas Volantes ---- */
@@ -970,15 +1009,34 @@ function renderMetasVolantes() {
   vacio.classList.add("hidden");
 
   const posMV = Object.keys(estado.puntuacion.metasVolantes).map(Number).sort((a, b) => a - b);
+  const cats = categoriasCorredores();
+
+  if (!cats.length) {
+    cont.innerHTML = `<div class="card"><p class="empty">Primero agregá corredores con su categoría en la pestaña Corredores.</p></div>`;
+    return;
+  }
 
   cont.innerHTML = e.metas.map((m) => {
-    const filas = posMV.map((pos) => {
-      const pts = estado.puntuacion.metasVolantes[pos];
-      return `<tr>
-        <td>${pos}°</td>
-        ${celdaDorsal("mv", m.id, pos, m.ganadores[pos] || "")}
-        <td>${pts} pts</td>
-      </tr>`;
+    if (!m.ganadoresPorCat) m.ganadoresPorCat = {};
+    const bloques = cats.map((cat) => {
+      const gan = m.ganadoresPorCat[cat] || {};
+      const filas = posMV.map((pos) => {
+        const pts = estado.puntuacion.metasVolantes[pos];
+        const clave = `${m.id}|${cat}|${pos}`;
+        return `<tr>
+          <td>${pos}°</td>
+          ${celdaDorsal("mv", clave, gan[pos] || "", cat)}
+          <td>${pts} pts</td>
+        </tr>`;
+      }).join("");
+      return `
+        <div class="cat-bloque">
+          <h5 class="cat-titulo">${escapeHtml(cat)}</h5>
+          <table class="tabla-pts">
+            <thead><tr><th>Pos.</th><th>Dorsal</th><th>Corredor</th><th>Puntos</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`;
     }).join("");
     return `
       <div class="mini-tabla">
@@ -986,10 +1044,7 @@ function renderMetasVolantes() {
           <input type="text" class="meta-nombre" value="${escapeHtml(m.nombre)}" placeholder="Nombre/ubicación (ej: Rest. California Km 25)" data-mv-nombre="${m.id}" />
           <span class="link-action no-print" data-mv-del="${m.id}">🗑️</span>
         </div>
-        <table class="tabla-pts">
-          <thead><tr><th>Pos.</th><th>Dorsal</th><th>Corredor</th><th>Puntos</th></tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
+        <div class="cat-grid">${bloques}</div>
       </div>`;
   }).join("");
 
@@ -1000,17 +1055,15 @@ function renderMetasVolantes() {
     }));
   cont.querySelectorAll("[data-mv-gan]").forEach((el) =>
     el.addEventListener("input", () => {
-      const [mid, pos] = el.dataset.mvGan.split(":");
+      const [mid, cat, pos] = el.dataset.mvGan.split("|");
       const m = e.metas.find((x) => x.id === mid);
       if (!m) return;
+      if (!m.ganadoresPorCat[cat]) m.ganadoresPorCat[cat] = {};
       const dorsal = el.value.trim();
-      if (!dorsal) { delete m.ganadores[pos]; }
-      else {
-        const c = corredorPorDorsal(dorsal);
-        if (c) m.ganadores[pos] = c.id;
-        else delete m.ganadores[pos];
-      }
-      actualizarInfoDorsal("mv", `${mid}:${pos}`, dorsal);
+      const c = dorsal ? resolverDorsalEnCategoria(dorsal, cat) : null;
+      if (c) m.ganadoresPorCat[cat][pos] = c.id;
+      else delete m.ganadoresPorCat[cat][pos];
+      actualizarInfoDorsal("mv", `${mid}|${cat}|${pos}`, dorsal, cat);
       guardar(); renderGeneralMV();
     }));
   cont.querySelectorAll("[data-mv-del]").forEach((el) =>
@@ -1026,7 +1079,7 @@ function renderMetasVolantes() {
 function agregarMetaVolante() {
   const e = etapaMVActual();
   if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
-  e.metas.push({ id: uid(), nombre: "", ganadores: {} });
+  e.metas.push({ id: uid(), nombre: "", ganadoresPorCat: {} });
   guardar(); renderMetasVolantes();
 }
 
@@ -1034,10 +1087,13 @@ function calcularGeneralMV() {
   const puntos = {}; // corredorId -> total
   estado.etapas.forEach((e) => {
     (e.metas || []).forEach((m) => {
-      Object.keys(m.ganadores).forEach((pos) => {
-        const cid = m.ganadores[pos];
-        const pts = estado.puntuacion.metasVolantes[pos] || 0;
-        if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+      const porCat = m.ganadoresPorCat || {};
+      Object.keys(porCat).forEach((cat) => {
+        Object.keys(porCat[cat]).forEach((pos) => {
+          const cid = porCat[cat][pos];
+          const pts = estado.puntuacion.metasVolantes[pos] || 0;
+          if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+        });
       });
     });
   });
@@ -1097,29 +1153,50 @@ function renderPremiosMontana() {
   if (!e) { cont.innerHTML = ""; vacio.classList.remove("hidden"); return; }
   vacio.classList.add("hidden");
 
-  const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+  const catsPremio = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+  const catsCorredor = categoriasCorredores();
+
+  if (!catsCorredor.length) {
+    cont.innerHTML = `<div class="card"><p class="empty">Primero agregá corredores con su categoría en la pestaña Corredores.</p></div>`;
+    return;
+  }
 
   cont.innerHTML = e.montana.map((pm) => {
-    const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
-    const posiciones = Object.keys(tablaCat).map(Number).sort((a, b) => a - b);
-    const filas = posiciones.map((pos) => `
-      <tr>
-        <td>${pos}°</td>
-        ${celdaDorsal("pm", pm.id, pos, pm.ganadores[pos] || "")}
-        <td>${tablaCat[pos]} pts</td>
-      </tr>`).join("") || `<tr><td colspan="4" class="muted">Esta categoría no tiene puntos configurados.</td></tr>`;
-    const opsCat = cats.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
+    if (!pm.ganadoresPorCat) pm.ganadoresPorCat = {};
+    const tablaPts = estado.puntuacion.montana[pm.categoria] || {};
+    const posiciones = Object.keys(tablaPts).map(Number).sort((a, b) => a - b);
+
+    const bloques = catsCorredor.map((cat) => {
+      const gan = pm.ganadoresPorCat[cat] || {};
+      const filas = posiciones.map((pos) => {
+        const clave = `${pm.id}|${cat}|${pos}`;
+        return `<tr>
+          <td>${pos}°</td>
+          ${celdaDorsal("pm", clave, gan[pos] || "", cat)}
+          <td>${tablaPts[pos]} pts</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="4" class="muted">Esta categoría de premio no tiene puntos configurados.</td></tr>`;
+      return `
+        <div class="cat-bloque">
+          <h5 class="cat-titulo">${escapeHtml(cat)}</h5>
+          <table class="tabla-pts">
+            <thead><tr><th>Pos.</th><th>Dorsal</th><th>Corredor</th><th>Puntos</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`;
+    }).join("");
+
+    const opsCat = catsPremio.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
     return `
       <div class="mini-tabla">
         <div class="meta-head">
           <input type="text" class="meta-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Nombre/ubicación (ej: Bahía Carey Km 63)" data-pm-nombre="${pm.id}" />
-          <select class="pm-cat-sel" data-pm-catsel="${pm.id}">${opsCat}</select>
+          <label class="pm-cat-label no-print">Categoría del premio
+            <select class="pm-cat-sel" data-pm-catsel="${pm.id}">${opsCat}</select>
+          </label>
           <span class="link-action no-print" data-pm-del="${pm.id}">🗑️</span>
         </div>
-        <table class="tabla-pts">
-          <thead><tr><th>Pos.</th><th>Dorsal</th><th>Corredor</th><th>Puntos</th></tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
+        <div class="cat-grid">${bloques}</div>
       </div>`;
   }).join("");
 
@@ -1131,21 +1208,19 @@ function renderPremiosMontana() {
   cont.querySelectorAll("[data-pm-catsel]").forEach((el) =>
     el.addEventListener("change", () => {
       const pm = e.montana.find((x) => x.id === el.dataset.pmCatsel);
-      if (pm) { pm.categoria = el.value; pm.ganadores = {}; guardar(); renderPremiosMontana(); renderGeneralPM(); }
+      if (pm) { pm.categoria = el.value; pm.ganadoresPorCat = {}; guardar(); renderPremiosMontana(); renderGeneralPM(); }
     }));
   cont.querySelectorAll("[data-pm-gan]").forEach((el) =>
     el.addEventListener("input", () => {
-      const [pmid, pos] = el.dataset.pmGan.split(":");
+      const [pmid, cat, pos] = el.dataset.pmGan.split("|");
       const pm = e.montana.find((x) => x.id === pmid);
       if (!pm) return;
+      if (!pm.ganadoresPorCat[cat]) pm.ganadoresPorCat[cat] = {};
       const dorsal = el.value.trim();
-      if (!dorsal) { delete pm.ganadores[pos]; }
-      else {
-        const c = corredorPorDorsal(dorsal);
-        if (c) pm.ganadores[pos] = c.id;
-        else delete pm.ganadores[pos];
-      }
-      actualizarInfoDorsal("pm", `${pmid}:${pos}`, dorsal);
+      const c = dorsal ? resolverDorsalEnCategoria(dorsal, cat) : null;
+      if (c) pm.ganadoresPorCat[cat][pos] = c.id;
+      else delete pm.ganadoresPorCat[cat][pos];
+      actualizarInfoDorsal("pm", `${pmid}|${cat}|${pos}`, dorsal, cat);
       guardar(); renderGeneralPM();
     }));
   cont.querySelectorAll("[data-pm-del]").forEach((el) =>
@@ -1163,7 +1238,7 @@ function agregarPremioMontana() {
   if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
   const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
   if (!cats.length) { alert("Primero configurá al menos una categoría de montaña en la pestaña Puntuación."); return; }
-  e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadores: {} });
+  e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadoresPorCat: {} });
   guardar(); renderPremiosMontana();
 }
 
@@ -1172,10 +1247,13 @@ function calcularGeneralPM() {
   estado.etapas.forEach((e) => {
     (e.montana || []).forEach((pm) => {
       const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
-      Object.keys(pm.ganadores).forEach((pos) => {
-        const cid = pm.ganadores[pos];
-        const pts = tablaCat[pos] || 0;
-        if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+      const porCat = pm.ganadoresPorCat || {};
+      Object.keys(porCat).forEach((cat) => {
+        Object.keys(porCat[cat]).forEach((pos) => {
+          const cid = porCat[cat][pos];
+          const pts = tablaCat[pos] || 0;
+          if (cid) puntos[cid] = (puntos[cid] || 0) + pts;
+        });
       });
     });
   });
