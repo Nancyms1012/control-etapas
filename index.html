@@ -94,7 +94,11 @@
     <div class="card">
       <div class="card-head no-print">
         <h2>Corredores inscritos (<span id="count-corredores">0</span>)</h2>
-        <input type="search" id="buscar-corredor" placeholder="Buscar..." class="search" />
+        <div class="filtros-corredor">
+          <input type="search" id="buscar-corredor" placeholder="Buscar..." class="search" />
+          <select id="filtro-cat-corredor"><option value="">Todas las categorías</option></select>
+          <select id="filtro-eq-corredor"><option value="">Todos los equipos</option></select>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="tabla-corredores">

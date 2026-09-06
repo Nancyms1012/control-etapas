@@ -164,6 +164,9 @@ let ordenCorredores = { campo: "dorsal", asc: true };
 function renderCorredores() {
   const tbody = $("#tabla-corredores tbody");
   const filtro = ($("#buscar-corredor").value || "").toLowerCase();
+  const filtroCat = ($("#filtro-cat-corredor") && $("#filtro-cat-corredor").value) || "";
+  const filtroEq = ($("#filtro-eq-corredor") && $("#filtro-eq-corredor").value) || "";
+  actualizarFiltrosCorredor();
   let lista = estado.corredores.slice();
 
   const { campo, asc } = ordenCorredores;
@@ -180,6 +183,8 @@ function renderCorredores() {
     lista = lista.filter((c) =>
       [c.dorsal, c.nombre, c.uciid, c.categoria, c.nac, c.equipo].join(" ").toLowerCase().includes(filtro));
   }
+  if (filtroCat) lista = lista.filter((c) => (c.categoria || "").trim() === filtroCat);
+  if (filtroEq) lista = lista.filter((c) => (c.equipo || "").trim() === filtroEq);
 
   tbody.innerHTML = "";
   lista.forEach((c) => {
@@ -197,7 +202,9 @@ function renderCorredores() {
       </td>`;
     tbody.appendChild(tr);
   });
-  $("#count-corredores").textContent = estado.corredores.length;
+  // Muestra "N de M" cuando hay filtro activo
+  const mostrados = lista.length, total = estado.corredores.length;
+  $("#count-corredores").textContent = (mostrados !== total) ? `${mostrados} de ${total}` : total;
 
   tbody.querySelectorAll("[data-del]").forEach((el) =>
     el.addEventListener("click", () => eliminarCorredor(el.dataset.del)));
@@ -244,6 +251,26 @@ function actualizarDatalistCategorias() {
     filtro.innerHTML = '<option value="">Todas</option>' +
       cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
     filtro.value = actual;
+  }
+}
+
+// Rellena los selects de filtro (categoría y equipo) de la pestaña Corredores.
+function actualizarFiltrosCorredor() {
+  const selCat = $("#filtro-cat-corredor");
+  const selEq = $("#filtro-eq-corredor");
+  if (selCat) {
+    const cats = [...new Set(estado.corredores.map((c) => (c.categoria || "").trim()).filter(Boolean))].sort();
+    const actual = selCat.value;
+    selCat.innerHTML = '<option value="">Todas las categorías</option>' +
+      cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    if (cats.includes(actual)) selCat.value = actual;
+  }
+  if (selEq) {
+    const eqs = [...new Set(estado.corredores.map((c) => (c.equipo || "").trim()).filter(Boolean))].sort();
+    const actual = selEq.value;
+    selEq.innerHTML = '<option value="">Todos los equipos</option>' +
+      eqs.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
+    if (eqs.includes(actual)) selEq.value = actual;
   }
 }
 
@@ -1670,6 +1697,8 @@ function init() {
   ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-categoria", "#c-nac", "#c-equipo"].forEach((s) =>
     $(s).addEventListener("keydown", (e) => { if (e.key === "Enter") agregarCorredor(); }));
   $("#buscar-corredor").addEventListener("input", renderCorredores);
+  $("#filtro-cat-corredor").addEventListener("change", renderCorredores);
+  $("#filtro-eq-corredor").addEventListener("change", renderCorredores);
   $("#btn-importar-csv").addEventListener("click", () => $("#file-csv").click());
   $("#btn-plantilla-csv").addEventListener("click", descargarPlantillaCSV);
   $("#file-csv").addEventListener("change", (e) => { if (e.target.files[0]) importarCSV(e.target.files[0]); e.target.value = ""; });

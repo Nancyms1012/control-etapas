@@ -75,6 +75,8 @@ input, select {
 input:focus, select:focus { outline: 2px solid var(--azul); border-color: var(--azul); }
 
 .search { min-width: 180px; }
+.filtros-corredor { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.filtros-corredor select { min-width: 150px; }
 
 .btn {
   padding: 9px 14px;
@@ -106,8 +108,18 @@ input:focus, select:focus { outline: 2px solid var(--azul); border-color: var(--
   font-size: 0.95rem;
   color: var(--muted);
   border-bottom: 3px solid transparent;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.15s, color 0.15s;
 }
-.tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); font-weight: 600; }
+.tab-btn:hover { background: #e8edf3; color: var(--azul-osc); }
+.tab-btn.active {
+  color: #fff;
+  background: var(--azul);
+  border-bottom-color: var(--azul-osc);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(10, 77, 140, 0.3);
+}
+.tab-btn.active:hover { background: var(--azul); color: #fff; }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
