@@ -47,9 +47,10 @@
   <!-- Pestañas -->
   <nav class="tabs no-print">
     <button class="tab-btn active" data-tab="corredores">Corredores</button>
-    <button class="tab-btn" data-tab="etapas">Etapas</button>
-    <button class="tab-btn" data-tab="general">General</button>
-    <button class="tab-btn" data-tab="metas">🟣 Metas Volantes</button>
+    <button class="tab-btn" data-tab="competencia">📋 Datos de competencia</button>
+    <button class="tab-btn" data-tab="registro">📝 Registro del día</button>
+    <button class="tab-btn" data-tab="general">🟡 General</button>
+    <button class="tab-btn" data-tab="metas">🟢 Metas Volantes</button>
     <button class="tab-btn" data-tab="montana">🔴 Montaña</button>
     <button class="tab-btn" data-tab="equipos">👥 Equipos</button>
     <button class="tab-btn" data-tab="puntuacion">Puntuación</button>
@@ -119,88 +120,108 @@
     </div>
   </section>
 
-  <!-- TAB: Etapas -->
-  <section class="tab-panel hidden" id="tab-etapas">
+  <!-- TAB: Datos de competencia -->
+  <section class="tab-panel hidden" id="tab-competencia">
+    <div class="card no-print">
+      <h2>📋 Datos de competencia</h2>
+      <p class="muted">Definí acá cada etapa con su recorrido y las metas volantes y premios de montaña que tendrá. Estos datos aparecerán luego en <strong>Registro del día</strong> para anotar los ganadores.</p>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-nueva-etapa">+ Nueva etapa</button>
+        <button class="btn no-print" id="btn-imprimir-competencia">🖨️ Imprimir hoja de ruta</button>
+      </div>
+    </div>
+
+    <div class="card" id="competencia-vacia">
+      <p class="empty">No hay etapas creadas. Presioná <strong>+ Nueva etapa</strong> para empezar.</p>
+    </div>
+
+    <div id="competencia-lista"></div>
+  </section>
+
+  <!-- TAB: Registro del día -->
+  <section class="tab-panel hidden" id="tab-registro">
     <div class="card no-print">
       <div class="etapa-toolbar">
-        <label>
-          Etapa
-          <select id="sel-etapa"></select>
-        </label>
-        <button class="btn" id="btn-nueva-etapa">+ Nueva etapa</button>
-        <button class="btn" id="btn-editar-etapa">✏️ Editar</button>
-        <button class="btn danger" id="btn-eliminar-etapa">🗑️ Eliminar etapa</button>
-      </div>
-
-      <!-- Formulario de datos de la etapa -->
-      <div id="form-etapa" class="form-etapa hidden">
-        <h3 class="sub-h" id="fe-titulo">Datos de la etapa</h3>
-        <div class="grid">
-          <label>Nombre <input type="text" id="fe-nombre" placeholder="Ej: Etapa 1" /></label>
-          <label>Fecha <input type="date" id="fe-fecha" /></label>
-          <label>Hora de salida <input type="time" id="fe-salida" step="1" /></label>
-          <label>Distancia (km) <input type="text" id="fe-km" placeholder="Ej: 102,0" /></label>
-        </div>
-        <label class="inline" style="max-width:none">Recorrido
-          <input type="text" id="fe-recorrido" placeholder="Ej: Quepos-Dominical-Ciudad Cortés-Palmar Norte" />
-        </label>
-        <div class="btn-row" style="margin-top:10px">
-          <button class="btn primary" id="fe-guardar">Guardar datos</button>
-          <button class="btn" id="fe-cancelar">Cancelar</button>
-        </div>
+        <label>Etapa / Día <select id="sel-etapa"></select></label>
       </div>
     </div>
 
     <div class="card" id="etapa-vacia-msg">
-      <p class="empty">No hay etapas creadas. Presiona <strong>+ Nueva etapa</strong> para empezar.</p>
+      <p class="empty">No hay etapas. Creá una en <strong>Datos de competencia</strong>.</p>
     </div>
 
-    <div class="card hidden" id="etapa-detalle">
-      <div class="etapa-encabezado">
-        <h2 id="etapa-titulo">Etapa</h2>
-        <p id="etapa-info" class="muted"></p>
-        <p id="etapa-recorrido" class="recorrido"></p>
-      </div>
-
-      <!-- Cronómetro (solo modo tiempo) -->
-      <div id="crono-box" class="crono-box no-print">
-        <div class="crono-display" id="crono-display">0:00:00.0</div>
-        <div class="crono-controles">
-          <button class="btn primary" id="crono-start">▶️ Iniciar</button>
-          <button class="btn" id="crono-pausa">⏸️ Pausar</button>
-          <button class="btn danger" id="crono-reset">⏹️ Reiniciar</button>
+    <div class="hidden" id="etapa-detalle">
+      <div class="card">
+        <div class="etapa-encabezado">
+          <h2 id="etapa-titulo">Etapa</h2>
+          <p id="etapa-info" class="muted"></p>
+          <p id="etapa-recorrido" class="recorrido"></p>
         </div>
-        <div class="crono-marcar">
-          <label>Marcar llegada por dorsal
-            <input type="number" id="crono-dorsal" placeholder="Dorsal" min="1" />
-          </label>
-          <button class="btn" id="crono-marcar-btn">🏁 Marcar tiempo</button>
-        </div>
-        <p class="muted" id="crono-ultimo"></p>
-        <details class="crono-ayuda">
-          <summary>¿Cómo funciona?</summary>
-          <p class="muted">Presioná <strong>Iniciar</strong> al dar la salida. Cuando cada corredor cruza la meta, escribí su dorsal y presioná <strong>Marcar tiempo</strong> (o Enter). El tiempo transcurrido se guarda automáticamente en su fila. Podés seguir editando los tiempos a mano abajo.</p>
-        </details>
-      </div>
 
-      <div class="table-wrap">
-        <table id="tabla-etapa">
-          <thead>
-            <tr>
-              <th>Pos.</th>
-              <th>Dorsal</th>
-              <th>Nombre</th>
-              <th>Categoría</th>
-              <th>Equipo</th>
-              <th id="th-resultado">Tiempo / Puntos</th>
-              <th>Estado</th>
-              <th class="no-print"></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <!-- Sub-pestañas dentro del registro del día -->
+        <nav class="subtabs no-print">
+          <button class="subtab-btn active" data-subtab="tiempos">⏱️ Tiempos</button>
+          <button class="subtab-btn" data-subtab="reg-metas">🟢 Metas Volantes</button>
+          <button class="subtab-btn" data-subtab="reg-montana">🔴 Montaña</button>
+        </nav>
+
+        <!-- SUB: Tiempos -->
+        <div class="subpanel" id="subtab-tiempos">
+          <!-- Cronómetro (solo modo tiempo) -->
+          <div id="crono-box" class="crono-box no-print">
+            <div class="crono-display" id="crono-display">0:00:00.0</div>
+            <div class="crono-controles">
+              <button class="btn primary" id="crono-start">▶️ Iniciar</button>
+              <button class="btn" id="crono-pausa">⏸️ Pausar</button>
+              <button class="btn danger" id="crono-reset">⏹️ Reiniciar</button>
+            </div>
+            <div class="crono-marcar">
+              <label>Marcar llegada por dorsal
+                <input type="number" id="crono-dorsal" placeholder="Dorsal" min="1" />
+              </label>
+              <button class="btn" id="crono-marcar-btn">🏁 Marcar tiempo</button>
+            </div>
+            <p class="muted" id="crono-ultimo"></p>
+            <details class="crono-ayuda">
+              <summary>¿Cómo funciona?</summary>
+              <p class="muted">Presioná <strong>Iniciar</strong> al dar la salida. Cuando cada corredor cruza la meta, escribí su dorsal y presioná <strong>Marcar tiempo</strong> (o Enter). El tiempo transcurrido se guarda automáticamente en su fila. Podés seguir editando los tiempos a mano abajo.</p>
+            </details>
+          </div>
+
+          <div class="table-wrap">
+            <table id="tabla-etapa">
+              <thead>
+                <tr>
+                  <th>Pos.</th>
+                  <th>Dorsal</th>
+                  <th>Nombre</th>
+                  <th>Categoría</th>
+                  <th>Equipo</th>
+                  <th id="th-resultado">Tiempo / Puntos</th>
+                  <th>Estado</th>
+                  <th class="no-print"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button class="btn no-print" id="btn-imprimir-etapa">🖨️ Imprimir / PDF etapa</button>
+        </div>
+
+        <!-- SUB: Metas Volantes (registro de ganadores) -->
+        <div class="subpanel hidden" id="subtab-reg-metas">
+          <p class="muted">Metas volantes de esta etapa (definidas en Datos de competencia). Ingresá el dorsal del ganador en cada posición y categoría.</p>
+          <div id="mv-lista" class="lista-metas"></div>
+          <div id="mv-vacio" class="hidden"><p class="empty">Esta etapa no tiene metas volantes definidas. Agregalas en <strong>Datos de competencia</strong>.</p></div>
+        </div>
+
+        <!-- SUB: Montaña (registro de ganadores) -->
+        <div class="subpanel hidden" id="subtab-reg-montana">
+          <p class="muted">Premios de montaña de esta etapa (definidos en Datos de competencia). Ingresá el dorsal del ganador en cada posición y categoría.</p>
+          <div id="pm-lista" class="lista-metas"></div>
+          <div id="pm-vacio" class="hidden"><p class="empty">Esta etapa no tiene premios de montaña definidos. Agregalos en <strong>Datos de competencia</strong>.</p></div>
+        </div>
       </div>
-      <button class="btn no-print" id="btn-imprimir-etapa">🖨️ Imprimir / PDF etapa</button>
     </div>
   </section>
 
@@ -227,21 +248,11 @@
     </div>
   </section>
 
-  <!-- TAB: Metas Volantes -->
+  <!-- TAB: Metas Volantes (general acumulada) -->
   <section class="tab-panel hidden" id="tab-metas">
-    <div class="card no-print">
-      <div class="etapa-toolbar">
-        <label>Etapa <select id="sel-etapa-mv"></select></label>
-        <button class="btn primary" id="btn-add-meta">+ Agregar meta volante</button>
-      </div>
-      <p class="muted">Por cada meta volante, seleccioná qué corredor llegó 1°, 2°, 3°. Los puntos se asignan solos (configurables en la pestaña Puntuación).</p>
-    </div>
-    <div class="card" id="mv-vacio"><p class="empty">No hay etapas. Creá una en la pestaña <strong>Etapas</strong>.</p></div>
-    <div id="mv-lista" class="lista-metas"></div>
-
     <div class="card">
       <div class="etapa-encabezado">
-        <h2>🟣 Clasificación general · Metas Volantes</h2>
+        <h2>🟢 Clasificación general · Metas Volantes</h2>
         <p class="muted">Rey de las metas volantes (acumulado de todas las etapas)</p>
         <label class="inline no-print">Filtrar por categoría
           <select id="filtro-cat-mv"><option value="">Todas las categorías</option></select>
@@ -258,18 +269,8 @@
     </div>
   </section>
 
-  <!-- TAB: Premios de Montaña -->
+  <!-- TAB: Premios de Montaña (general acumulada) -->
   <section class="tab-panel hidden" id="tab-montana">
-    <div class="card no-print">
-      <div class="etapa-toolbar">
-        <label>Etapa <select id="sel-etapa-pm"></select></label>
-        <button class="btn primary" id="btn-add-premio">+ Agregar premio de montaña</button>
-      </div>
-      <p class="muted">Por cada premio elegí su categoría y qué corredor pasó en cada posición. Los puntos dependen de la categoría (configurables en Puntuación).</p>
-    </div>
-    <div class="card" id="pm-vacio"><p class="empty">No hay etapas. Creá una en la pestaña <strong>Etapas</strong>.</p></div>
-    <div id="pm-lista" class="lista-metas"></div>
-
     <div class="card">
       <div class="etapa-encabezado">
         <h2>🔴 Clasificación general · Premios de Montaña</h2>

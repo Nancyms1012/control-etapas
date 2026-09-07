@@ -225,6 +225,23 @@ hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
 .cat-titulo { margin: 0 0 6px; font-size: 0.9rem; color: var(--azul); background: #eef4fb; padding: 3px 8px; border-radius: 5px; }
 .pm-cat-label { flex-direction: row; align-items: center; gap: 6px; font-size: 0.8rem; }
 .pm-cat-label select { width: auto; }
+
+/* Sub-pestañas del Registro del día */
+.subtabs { display: flex; gap: 4px; margin: 4px 0 12px; border-bottom: 1px solid var(--gris-borde); flex-wrap: wrap; }
+.subtab-btn {
+  padding: 8px 14px; border: none; background: transparent; cursor: pointer;
+  font-size: 0.9rem; color: var(--muted); border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0;
+}
+.subtab-btn:hover { background: #e8edf3; }
+.subtab-btn.active { color: var(--azul); border-bottom-color: var(--azul); font-weight: 700; background: #eef4fb; }
+
+/* Datos de competencia */
+.comp-etapa { border-left: 4px solid var(--azul); }
+.comp-listas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+.comp-sublista .tabla-pts td { padding: 4px 6px; }
+.comp-input { width: 100%; }
+.meta-titulo { margin: 0; font-size: 0.98rem; color: var(--azul-osc); }
+.badge-cat { font-size: 0.75rem; background: #fdeceb; color: var(--rojo); padding: 1px 7px; border-radius: 10px; margin-left: 4px; }
 .fila-marcada { animation: destello 1s ease; }
 @keyframes destello { from { background: #d9f0e2; } to { background: transparent; } }
 

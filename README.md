@@ -43,10 +43,13 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
     columnas `dorsal, nombre, uci id, categoria, nac, equipo` para cargar decenas de corredores de una vez.
     Detecta automáticamente el separador (`,`, `;` o tab) y si la primera fila es encabezado.
     Podés **agregar** al final o **reemplazar** la lista. Hay una **plantilla descargable**.
-- **Etapas:** crear varias etapas con **nombre, fecha, hora de salida, distancia (km) y recorrido**.
-  Estos datos se muestran en el encabezado de la etapa y salen en la impresión. Por cada etapa se registra el
-  **tiempo o puntos** de cada corredor y su **estado**: OK, **DNF** (no finalizó),
-  **DNS** (no salió), **DSQ** (descalificado). La posición de cada etapa se calcula sola.
+- **Datos de competencia:** definís de antemano cada etapa con **nombre, fecha, hora de salida,
+  distancia (km) y recorrido**, y las listas de **metas volantes** (lugar) y **premios de montaña**
+  (lugar + categoría de premio). Es la hoja de ruta maestra; se puede imprimir.
+- **Registro del día:** elegís la etapa/día y registrás TODO lo de esa jornada en un solo lugar,
+  con sub-pestañas: **⏱️ Tiempos** (con cronómetro y estado OK/DNF/DNS/DSQ), **🟢 Metas Volantes**
+  y **🔴 Montaña** (los ganadores por dorsal). Las metas y premios que aparecen son los definidos
+  en Datos de competencia.
 - **Clasificación general (acumulado):** se calcula automáticamente a partir de las etapas,
   con diferencia de tiempo respecto al líder (en modo tiempo) y filtro por categoría.
 - **Imprimir / PDF:** botones para imprimir la etapa o la general con encabezado del evento
@@ -59,10 +62,11 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
 Abrí `index.html` en cualquier navegador. Funciona sin conexión una vez cargada.
 
 1. Completá la **Configuración del evento** y elegí el tipo de clasificación.
-2. En **Corredores**, agregá a los participantes.
-3. En **Etapas**, creá cada etapa e ingresá tiempos/puntos y estados.
-4. En **Clasificación general** ves el acumulado; usá los botones de imprimir para generar el PDF.
-5. En **Respaldo**, exportá el `.json` para tener copia o pasarlo a otro dispositivo.
+2. En **Corredores**, agregá a los participantes (o importá el CSV).
+3. En **Datos de competencia**, creá cada etapa con su recorrido y sus metas volantes y premios de montaña.
+4. Durante la carrera, en **Registro del día** elegís la etapa y anotás tiempos, metas y montaña.
+5. Las clasificaciones **General, Metas Volantes, Montaña y Equipos** se forman solas (acumulado).
+6. En **Respaldo**, exportá el `.json` para tener copia o pasarlo a otro dispositivo.
 
 ## Despliegue en Cloudflare Pages
 

@@ -29,7 +29,7 @@ let estado = {
   //          metas: [ { id, nombre, ganadores: { pos -> corredorId } } ],
   //          montana: [ { id, nombre, categoria, ganadores: { pos -> corredorId } } ] }
   etapas: [],
-  seleccion: { etapaId: null, etapaMV: null, etapaPM: null }
+  seleccion: { etapaId: null, etapaEq: null }
 };
 
 /* ---------- Utilidades ---------- */
@@ -291,63 +291,28 @@ function nuevaEtapa() {
   estado.seleccion.etapaId = etapa.id;
   guardar();
   renderTodo();
-  abrirFormEtapa(etapa.id); // abre el formulario para completar los datos
 }
 
-function editarEtapa() {
-  const e = etapaActual();
+function eliminarEtapa(id) {
+  const e = etapaPorId(id) || etapaActual();
   if (!e) return;
-  abrirFormEtapa(e.id);
-}
-
-function abrirFormEtapa(id) {
-  const e = etapaPorId(id);
-  if (!e) return;
-  $("#fe-titulo").textContent = `Datos de la ${e.nombre}`;
-  $("#fe-nombre").value = e.nombre || "";
-  $("#fe-fecha").value = e.fecha || "";
-  $("#fe-salida").value = e.salida || "";
-  $("#fe-km").value = e.km || "";
-  $("#fe-recorrido").value = e.recorrido || "";
-  $("#form-etapa").dataset.editando = id;
-  $("#form-etapa").classList.remove("hidden");
-  $("#fe-nombre").focus();
-}
-
-function guardarFormEtapa() {
-  const id = $("#form-etapa").dataset.editando;
-  const e = etapaPorId(id);
-  if (!e) return;
-  e.nombre = $("#fe-nombre").value.trim() || e.nombre;
-  e.fecha = $("#fe-fecha").value.trim();
-  e.salida = $("#fe-salida").value.trim();
-  e.km = $("#fe-km").value.trim();
-  e.recorrido = $("#fe-recorrido").value.trim();
-  $("#form-etapa").classList.add("hidden");
-  guardar();
-  renderTodo();
-}
-
-function cancelarFormEtapa() {
-  $("#form-etapa").classList.add("hidden");
-}
-
-function eliminarEtapa() {
-  const e = etapaActual();
-  if (!e) return;
-  if (!confirm(`¿Eliminar "${e.nombre}" y todos sus resultados?`)) return;
+  if (!confirm(`¿Eliminar "${e.nombre}" con todos sus datos (tiempos, metas y premios)?`)) return;
   estado.etapas = estado.etapas.filter((x) => x.id !== e.id);
   estado.etapas.forEach((et, i) => (et.numero = i + 1));
-  estado.seleccion.etapaId = estado.etapas.length ? estado.etapas[0].id : null;
+  if (estado.seleccion.etapaId === e.id) {
+    estado.seleccion.etapaId = estado.etapas.length ? estado.etapas[0].id : null;
+  }
   guardar();
   renderTodo();
 }
 
 function renderSelectEtapas() {
   const sel = $("#sel-etapa");
+  if (!sel) return;
   sel.innerHTML = estado.etapas
     .map((e) => `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`)
     .join("");
+  if (!estado.seleccion.etapaId && estado.etapas.length) estado.seleccion.etapaId = estado.etapas[0].id;
   if (estado.seleccion.etapaId) sel.value = estado.seleccion.etapaId;
 }
 
@@ -356,6 +321,150 @@ function resultadoDe(etapa, corredorId) {
     etapa.resultados[corredorId] = { estado: "ok", tiempo: "", puntos: "" };
   }
   return etapa.resultados[corredorId];
+}
+
+/* ================================================================
+   DATOS DE COMPETENCIA (definir etapas + metas + premios)
+   ================================================================ */
+function renderCompetencia() {
+  const cont = $("#competencia-lista");
+  const vacia = $("#competencia-vacia");
+  if (!cont) return;
+
+  if (!estado.etapas.length) {
+    cont.innerHTML = "";
+    if (vacia) vacia.classList.remove("hidden");
+    return;
+  }
+  if (vacia) vacia.classList.add("hidden");
+
+  const catsPremio = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+
+  cont.innerHTML = estado.etapas.map((e) => {
+    const metasHTML = (e.metas || []).map((m) => `
+      <tr>
+        <td><input type="text" class="comp-input" value="${escapeHtml(m.nombre)}" placeholder="Lugar (ej: Rest. California Km 25)" data-cmeta="${e.id}:${m.id}" /></td>
+        <td class="no-print"><span class="link-action" data-cmeta-del="${e.id}:${m.id}">🗑️</span></td>
+      </tr>`).join("") || `<tr><td colspan="2" class="muted">Sin metas volantes.</td></tr>`;
+
+    const premiosHTML = (e.montana || []).map((pm) => {
+      const opsCat = catsPremio.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
+      return `
+      <tr>
+        <td><input type="text" class="comp-input" value="${escapeHtml(pm.nombre)}" placeholder="Lugar (ej: Bahía Carey Km 63)" data-cpm="${e.id}:${pm.id}" /></td>
+        <td><select data-cpm-cat="${e.id}:${pm.id}">${opsCat}</select></td>
+        <td class="no-print"><span class="link-action" data-cpm-del="${e.id}:${pm.id}">🗑️</span></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="3" class="muted">Sin premios de montaña.</td></tr>`;
+
+    return `
+      <div class="card comp-etapa">
+        <div class="comp-etapa-datos">
+          <div class="grid">
+            <label>Nombre <input type="text" class="comp-input" value="${escapeHtml(e.nombre)}" data-eta="${e.id}:nombre" /></label>
+            <label>Fecha <input type="date" class="comp-input" value="${escapeHtml(e.fecha)}" data-eta="${e.id}:fecha" /></label>
+            <label>Hora de salida <input type="time" step="1" class="comp-input" value="${escapeHtml(e.salida)}" data-eta="${e.id}:salida" /></label>
+            <label>Distancia (km) <input type="text" class="comp-input" value="${escapeHtml(e.km)}" placeholder="Ej: 102,0" data-eta="${e.id}:km" /></label>
+          </div>
+          <label class="inline" style="max-width:none">Recorrido
+            <input type="text" class="comp-input" value="${escapeHtml(e.recorrido)}" placeholder="Ej: Quepos-Dominical-Ciudad Cortés-Palmar Norte" data-eta="${e.id}:recorrido" />
+          </label>
+          <div class="comp-listas">
+            <div class="comp-sublista">
+              <h4 class="sub-h">🟢 Metas Volantes</h4>
+              <table class="tabla-pts"><tbody>${metasHTML}</tbody></table>
+              <button class="btn small no-print" data-add-meta="${e.id}">+ meta volante</button>
+            </div>
+            <div class="comp-sublista">
+              <h4 class="sub-h">🔴 Premios de Montaña</h4>
+              <table class="tabla-pts"><tbody>${premiosHTML}</tbody></table>
+              <button class="btn small no-print" data-add-premio="${e.id}">+ premio de montaña</button>
+            </div>
+          </div>
+          <div class="btn-row no-print" style="margin-top:10px">
+            <button class="btn danger small" data-del-etapa="${e.id}">🗑️ Eliminar etapa</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Listeners de datos de etapa
+  cont.querySelectorAll("[data-eta]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [id, campo] = el.dataset.eta.split(":");
+      const e = etapaPorId(id);
+      if (!e) return;
+      e[campo] = el.value.trim();
+      guardar();
+      if (campo === "nombre" || campo === "fecha") { renderSelectEtapas(); renderEquipos(); }
+    }));
+
+  // Metas
+  cont.querySelectorAll("[data-cmeta]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [eid, mid] = el.dataset.cmeta.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      const m = e.metas.find((x) => x.id === mid);
+      if (m) { m.nombre = el.value.trim(); guardar(); }
+    }));
+  cont.querySelectorAll("[data-cmeta-del]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const [eid, mid] = el.dataset.cmetaDel.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      if (!confirm("¿Eliminar esta meta volante de la etapa?")) return;
+      e.metas = e.metas.filter((x) => x.id !== mid);
+      guardar(); renderCompetencia(); renderMetasVolantes();
+    }));
+  cont.querySelectorAll("[data-add-meta]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const e = etapaPorId(el.dataset.addMeta); if (!e) return;
+      if (!e.metas) e.metas = [];
+      e.metas.push({ id: uid(), nombre: "", ganadoresPorCat: {} });
+      guardar(); renderCompetencia(); renderMetasVolantes();
+    }));
+
+  // Premios
+  cont.querySelectorAll("[data-cpm]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [eid, pid] = el.dataset.cpm.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      const pm = e.montana.find((x) => x.id === pid);
+      if (pm) { pm.nombre = el.value.trim(); guardar(); }
+    }));
+  cont.querySelectorAll("[data-cpm-cat]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [eid, pid] = el.dataset.cpmCat.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      const pm = e.montana.find((x) => x.id === pid);
+      if (pm) { pm.categoria = el.value; pm.ganadoresPorCat = {}; guardar(); renderPremiosMontana(); }
+    }));
+  cont.querySelectorAll("[data-cpm-del]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const [eid, pid] = el.dataset.cpmDel.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      if (!confirm("¿Eliminar este premio de montaña de la etapa?")) return;
+      e.montana = e.montana.filter((x) => x.id !== pid);
+      guardar(); renderCompetencia(); renderPremiosMontana();
+    }));
+  cont.querySelectorAll("[data-add-premio]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const e = etapaPorId(el.dataset.addPremio); if (!e) return;
+      const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+      if (!cats.length) { alert("Primero configurá al menos una categoría de montaña en la pestaña Puntuación."); return; }
+      if (!e.montana) e.montana = [];
+      e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadoresPorCat: {} });
+      guardar(); renderCompetencia(); renderPremiosMontana();
+    }));
+
+  // Eliminar etapa
+  cont.querySelectorAll("[data-del-etapa]").forEach((el) =>
+    el.addEventListener("click", () => eliminarEtapa(el.dataset.delEtapa)));
+}
+
+function imprimirCompetencia() {
+  mostrarSoloTab("competencia");
+  prepararEncabezadoImpresion("Datos de competencia · Hoja de ruta");
+  window.print();
 }
 
 /* Calcula posiciones de una etapa según tipo */
@@ -710,7 +819,7 @@ function prepararEncabezadoImpresion(subtitulo) {
 function imprimirEtapa() {
   const e = etapaActual();
   if (!e) return;
-  mostrarSoloTab("etapas");
+  mostrarSoloTab("registro");
   const detalles = [];
   if (e.salida) detalles.push("Salida: " + e.salida);
   if (e.km) detalles.push(e.km + " km");
@@ -1063,30 +1172,32 @@ function resolverDorsalEnCategoria(dorsal, catEsperada) {
 }
 
 /* ---- Metas Volantes ---- */
-function etapaMVActual() { return etapaPorId(estado.seleccion.etapaMV); }
-
+// Registro de ganadores de metas volantes en el Registro del día (usa la etapa seleccionada única).
 function renderMetasVolantes() {
-  const sel = $("#sel-etapa-mv");
-  sel.innerHTML = estado.etapas.map((e) =>
-    `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`).join("");
-  if (!estado.seleccion.etapaMV && estado.etapas.length) estado.seleccion.etapaMV = estado.etapas[0].id;
-  if (estado.seleccion.etapaMV) sel.value = estado.seleccion.etapaMV;
-
-  const e = etapaMVActual();
+  const e = etapaActual();
   const cont = $("#mv-lista");
   const vacio = $("#mv-vacio");
-  if (!e) { cont.innerHTML = ""; vacio.classList.remove("hidden"); return; }
-  vacio.classList.add("hidden");
+  if (!cont) return;
+  if (!e) { cont.innerHTML = ""; if (vacio) vacio.classList.remove("hidden"); renderGeneralMV(); return; }
 
-  const posMV = Object.keys(estado.puntuacion.metasVolantes).map(Number).sort((a, b) => a - b);
   const cats = categoriasCorredores();
-
   if (!cats.length) {
     cont.innerHTML = `<div class="card"><p class="empty">Primero agregá corredores con su categoría en la pestaña Corredores.</p></div>`;
-    return;
+    if (vacio) vacio.classList.add("hidden");
+    renderGeneralMV(); return;
   }
 
-  cont.innerHTML = e.metas.map((m) => {
+  const metas = e.metas || [];
+  if (!metas.length) {
+    cont.innerHTML = "";
+    if (vacio) vacio.classList.remove("hidden");
+    renderGeneralMV(); return;
+  }
+  if (vacio) vacio.classList.add("hidden");
+
+  const posMV = Object.keys(estado.puntuacion.metasVolantes).map(Number).sort((a, b) => a - b);
+
+  cont.innerHTML = metas.map((m) => {
     if (!m.ganadoresPorCat) m.ganadoresPorCat = {};
     const bloques = cats.map((cat) => {
       const gan = m.ganadoresPorCat[cat] || {};
@@ -1111,18 +1222,12 @@ function renderMetasVolantes() {
     return `
       <div class="mini-tabla">
         <div class="meta-head">
-          <input type="text" class="meta-nombre" value="${escapeHtml(m.nombre)}" placeholder="Nombre/ubicación (ej: Rest. California Km 25)" data-mv-nombre="${m.id}" />
-          <span class="link-action no-print" data-mv-del="${m.id}">🗑️</span>
+          <h4 class="meta-titulo">🟢 ${escapeHtml(m.nombre || "Meta volante")}</h4>
         </div>
         <div class="cat-grid">${bloques}</div>
       </div>`;
   }).join("");
 
-  cont.querySelectorAll("[data-mv-nombre]").forEach((el) =>
-    el.addEventListener("change", () => {
-      const m = e.metas.find((x) => x.id === el.dataset.mvNombre);
-      if (m) { m.nombre = el.value; guardar(); }
-    }));
   cont.querySelectorAll("[data-mv-gan]").forEach((el) =>
     el.addEventListener("input", () => {
       const [mid, cat, pos] = el.dataset.mvGan.split("|");
@@ -1136,21 +1241,8 @@ function renderMetasVolantes() {
       actualizarInfoDorsal("mv", `${mid}|${cat}|${pos}`, dorsal, cat);
       guardar(); renderGeneralMV();
     }));
-  cont.querySelectorAll("[data-mv-del]").forEach((el) =>
-    el.addEventListener("click", () => {
-      if (!confirm("¿Eliminar esta meta volante?")) return;
-      e.metas = e.metas.filter((x) => x.id !== el.dataset.mvDel);
-      guardar(); renderMetasVolantes(); renderGeneralMV();
-    }));
 
   renderGeneralMV();
-}
-
-function agregarMetaVolante() {
-  const e = etapaMVActual();
-  if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
-  e.metas.push({ id: uid(), nombre: "", ganadoresPorCat: {} });
-  guardar(); renderMetasVolantes();
 }
 
 function calcularGeneralMV() {
@@ -1225,31 +1317,32 @@ function actualizarFiltroCat(sel) {
   el.value = actual;
 }
 
-/* ---- Premios de Montaña ---- */
-function etapaPMActual() { return etapaPorId(estado.seleccion.etapaPM); }
-
+/* ---- Premios de Montaña (registro de ganadores) ---- */
+// Usa la etapa seleccionada única (Registro del día). El lugar y la categoría de premio
+// se definen en Datos de competencia; acá solo se ingresan los ganadores.
 function renderPremiosMontana() {
-  const sel = $("#sel-etapa-pm");
-  sel.innerHTML = estado.etapas.map((e) =>
-    `<option value="${e.id}">${escapeHtml(e.nombre)}${e.fecha ? " · " + e.fecha : ""}</option>`).join("");
-  if (!estado.seleccion.etapaPM && estado.etapas.length) estado.seleccion.etapaPM = estado.etapas[0].id;
-  if (estado.seleccion.etapaPM) sel.value = estado.seleccion.etapaPM;
-
-  const e = etapaPMActual();
+  const e = etapaActual();
   const cont = $("#pm-lista");
   const vacio = $("#pm-vacio");
-  if (!e) { cont.innerHTML = ""; vacio.classList.remove("hidden"); return; }
-  vacio.classList.add("hidden");
+  if (!cont) return;
+  if (!e) { cont.innerHTML = ""; if (vacio) vacio.classList.remove("hidden"); renderGeneralPM(); return; }
 
-  const catsPremio = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
   const catsCorredor = categoriasCorredores();
-
   if (!catsCorredor.length) {
     cont.innerHTML = `<div class="card"><p class="empty">Primero agregá corredores con su categoría en la pestaña Corredores.</p></div>`;
-    return;
+    if (vacio) vacio.classList.add("hidden");
+    renderGeneralPM(); return;
   }
 
-  cont.innerHTML = e.montana.map((pm) => {
+  const premios = e.montana || [];
+  if (!premios.length) {
+    cont.innerHTML = "";
+    if (vacio) vacio.classList.remove("hidden");
+    renderGeneralPM(); return;
+  }
+  if (vacio) vacio.classList.add("hidden");
+
+  cont.innerHTML = premios.map((pm) => {
     if (!pm.ganadoresPorCat) pm.ganadoresPorCat = {};
     const tablaPts = estado.puntuacion.montana[pm.categoria] || {};
     const posiciones = Object.keys(tablaPts).map(Number).sort((a, b) => a - b);
@@ -1263,7 +1356,7 @@ function renderPremiosMontana() {
           ${celdaDorsal("pm", clave, gan[pos] || "", cat)}
           <td>${tablaPts[pos]} pts</td>
         </tr>`;
-      }).join("") || `<tr><td colspan="4" class="muted">Esta categoría de premio no tiene puntos configurados.</td></tr>`;
+      }).join("") || `<tr><td colspan="4" class="muted">Categoría de premio sin puntos configurados.</td></tr>`;
       return `
         <div class="cat-bloque">
           <h5 class="cat-titulo">${escapeHtml(cat)}</h5>
@@ -1274,30 +1367,15 @@ function renderPremiosMontana() {
         </div>`;
     }).join("");
 
-    const opsCat = catsPremio.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
     return `
       <div class="mini-tabla">
         <div class="meta-head">
-          <input type="text" class="meta-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Nombre/ubicación (ej: Bahía Carey Km 63)" data-pm-nombre="${pm.id}" />
-          <label class="pm-cat-label no-print">Categoría del premio
-            <select class="pm-cat-sel" data-pm-catsel="${pm.id}">${opsCat}</select>
-          </label>
-          <span class="link-action no-print" data-pm-del="${pm.id}">🗑️</span>
+          <h4 class="meta-titulo">🔴 ${escapeHtml(pm.nombre || "Premio de montaña")} <span class="badge-cat">Cat ${escapeHtml(pm.categoria)}</span></h4>
         </div>
         <div class="cat-grid">${bloques}</div>
       </div>`;
   }).join("");
 
-  cont.querySelectorAll("[data-pm-nombre]").forEach((el) =>
-    el.addEventListener("change", () => {
-      const pm = e.montana.find((x) => x.id === el.dataset.pmNombre);
-      if (pm) { pm.nombre = el.value; guardar(); }
-    }));
-  cont.querySelectorAll("[data-pm-catsel]").forEach((el) =>
-    el.addEventListener("change", () => {
-      const pm = e.montana.find((x) => x.id === el.dataset.pmCatsel);
-      if (pm) { pm.categoria = el.value; pm.ganadoresPorCat = {}; guardar(); renderPremiosMontana(); renderGeneralPM(); }
-    }));
   cont.querySelectorAll("[data-pm-gan]").forEach((el) =>
     el.addEventListener("input", () => {
       const [pmid, cat, pos] = el.dataset.pmGan.split("|");
@@ -1311,23 +1389,8 @@ function renderPremiosMontana() {
       actualizarInfoDorsal("pm", `${pmid}|${cat}|${pos}`, dorsal, cat);
       guardar(); renderGeneralPM();
     }));
-  cont.querySelectorAll("[data-pm-del]").forEach((el) =>
-    el.addEventListener("click", () => {
-      if (!confirm("¿Eliminar este premio de montaña?")) return;
-      e.montana = e.montana.filter((x) => x.id !== el.dataset.pmDel);
-      guardar(); renderPremiosMontana(); renderGeneralPM();
-    }));
 
   renderGeneralPM();
-}
-
-function agregarPremioMontana() {
-  const e = etapaPMActual();
-  if (!e) { alert("Primero creá una etapa en la pestaña Etapas."); return; }
-  const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
-  if (!cats.length) { alert("Primero configurá al menos una categoría de montaña en la pestaña Puntuación."); return; }
-  e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadoresPorCat: {} });
-  guardar(); renderPremiosMontana();
 }
 
 function calcularGeneralPM() {
@@ -1663,6 +1726,7 @@ function cargarConfigEnUI() {
 
 function renderTodo() {
   renderCorredores();
+  renderCompetencia();
   renderEtapa();
   renderGeneral();
   renderPuntuacion();
@@ -1670,6 +1734,12 @@ function renderTodo() {
   renderEquipos();
   renderCaravana();
   actualizarDatalistCategorias();
+}
+
+// Sub-pestañas dentro de "Registro del día" (Tiempos / Metas / Montaña)
+function mostrarSubtab(sub) {
+  $$(".subtab-btn").forEach((b) => b.classList.toggle("active", b.dataset.subtab === sub));
+  $$(".subpanel").forEach((p) => p.classList.toggle("hidden", p.id !== "subtab-" + sub));
 }
 
 /* ---------- Eventos ---------- */
@@ -1710,14 +1780,17 @@ function init() {
       renderCorredores();
     }));
 
-  // Etapas
+  // Datos de competencia
   $("#btn-nueva-etapa").addEventListener("click", nuevaEtapa);
-  $("#btn-editar-etapa").addEventListener("click", editarEtapa);
-  $("#btn-eliminar-etapa").addEventListener("click", eliminarEtapa);
-  $("#fe-guardar").addEventListener("click", guardarFormEtapa);
-  $("#fe-cancelar").addEventListener("click", cancelarFormEtapa);
-  $("#sel-etapa").addEventListener("change", (e) => { estado.seleccion.etapaId = e.target.value; guardar(); renderEtapa(); });
+  $("#btn-imprimir-competencia").addEventListener("click", imprimirCompetencia);
+
+  // Registro del día
+  $("#sel-etapa").addEventListener("change", (e) => {
+    estado.seleccion.etapaId = e.target.value; guardar();
+    renderEtapa(); renderMetasVolantes(); renderPremiosMontana();
+  });
   $("#btn-imprimir-etapa").addEventListener("click", imprimirEtapa);
+  $$(".subtab-btn").forEach((b) => b.addEventListener("click", () => mostrarSubtab(b.dataset.subtab)));
 
   // Cronómetro
   $("#crono-start").addEventListener("click", cronoStart);
@@ -1736,15 +1809,11 @@ function init() {
   $("#btn-pts-montana-add").addEventListener("click", agregarCategoriaMontana);
   $("#btn-pts-restaurar").addEventListener("click", restaurarPuntuacion);
 
-  // Metas Volantes
-  $("#sel-etapa-mv").addEventListener("change", (e) => { estado.seleccion.etapaMV = e.target.value; guardar(); renderMetasVolantes(); });
-  $("#btn-add-meta").addEventListener("click", agregarMetaVolante);
+  // Metas Volantes (general acumulada)
   $("#btn-imprimir-mv").addEventListener("click", imprimirGeneralMV);
   $("#filtro-cat-mv").addEventListener("change", renderGeneralMV);
 
-  // Premios de Montaña
-  $("#sel-etapa-pm").addEventListener("change", (e) => { estado.seleccion.etapaPM = e.target.value; guardar(); renderPremiosMontana(); });
-  $("#btn-add-premio").addEventListener("click", agregarPremioMontana);
+  // Premios de Montaña (general acumulada)
   $("#btn-imprimir-pm").addEventListener("click", imprimirGeneralPM);
   $("#filtro-cat-pm").addEventListener("change", renderGeneralPM);
 
