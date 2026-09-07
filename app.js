@@ -146,7 +146,11 @@ function agregarCorredor() {
   const dorsal = $("#c-dorsal").value.trim();
   const nombre = $("#c-nombre").value.trim();
   const uciid = $("#c-uciid").value.trim();
-  const categoria = $("#c-categoria").value.trim();
+  // La categoría sale del desplegable; si eligió "Nueva categoría…" se toma del campo de texto
+  const selCat = $("#c-categoria");
+  const categoria = (selCat.value === "__nueva__")
+    ? $("#c-categoria-nueva").value.trim()
+    : selCat.value.trim();
   const nac = $("#c-nac").value.trim();
   const equipo = $("#c-equipo").value.trim();
   if (!nombre) { alert("El nombre es obligatorio."); return; }
@@ -154,10 +158,13 @@ function agregarCorredor() {
     if (!confirm("Ya existe un corredor con ese dorsal. ¿Agregar de todos modos?")) return;
   }
   estado.corredores.push({ id: uid(), dorsal, nombre, uciid, categoria, nac, equipo });
-  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-categoria", "#c-nac", "#c-equipo"].forEach((s) => ($(s).value = ""));
+  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-nac", "#c-equipo", "#c-categoria-nueva"].forEach((s) => ($(s).value = ""));
+  $("#c-categoria-nueva").classList.add("hidden");
   $("#c-dorsal").focus();
   guardar();
-  renderTodo();
+  renderTodo(); // renderTodo -> actualizarDatalistCategorias deja la categoría recién usada seleccionada
+  // Deja seleccionada la categoría que se acaba de usar (cómodo para cargar varios de la misma)
+  if (categoria) { const s = $("#c-categoria"); if ([...s.options].some((o) => o.value === categoria)) s.value = categoria; }
 }
 
 let ordenCorredores = { campo: "dorsal", asc: true };
@@ -243,8 +250,21 @@ function editarCorredor(id) {
 
 function actualizarDatalistCategorias() {
   const cats = [...new Set(estado.corredores.map((c) => c.categoria).filter(Boolean))].sort();
-  const dl = $("#cats");
-  if (dl) dl.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">`).join("");
+
+  // Desplegable de categoría en "Agregar corredor" (se arma con las categorías existentes)
+  const selCat = $("#c-categoria");
+  if (selCat) {
+    const actual = selCat.value;
+    selCat.innerHTML =
+      (cats.length ? "" : '<option value="">— (aún no hay categorías) —</option>') +
+      cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("") +
+      '<option value="__nueva__">➕ Nueva categoría…</option>';
+    // conserva la selección previa si sigue existiendo
+    if (cats.includes(actual)) selCat.value = actual;
+    else if (actual === "__nueva__") selCat.value = "__nueva__";
+    else if (!cats.length) selCat.value = "__nueva__";
+  }
+
   const filtro = $("#filtro-categoria");
   if (filtro) {
     const actual = filtro.value;
@@ -1769,8 +1789,14 @@ function init() {
 
   // Corredores
   $("#btn-add-corredor").addEventListener("click", agregarCorredor);
-  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-categoria", "#c-nac", "#c-equipo"].forEach((s) =>
+  ["#c-dorsal", "#c-nombre", "#c-uciid", "#c-nac", "#c-equipo", "#c-categoria-nueva"].forEach((s) =>
     $(s).addEventListener("keydown", (e) => { if (e.key === "Enter") agregarCorredor(); }));
+  // Mostrar el campo de texto solo cuando se elige "Nueva categoría…"
+  $("#c-categoria").addEventListener("change", (e) => {
+    const nueva = $("#c-categoria-nueva");
+    if (e.target.value === "__nueva__") { nueva.classList.remove("hidden"); nueva.focus(); }
+    else { nueva.classList.add("hidden"); nueva.value = ""; }
+  });
   $("#buscar-corredor").addEventListener("input", renderCorredores);
   $("#filtro-cat-corredor").addEventListener("change", renderCorredores);
   $("#filtro-eq-corredor").addEventListener("change", renderCorredores);

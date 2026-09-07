@@ -65,11 +65,13 @@
         <label>Dorsal <input type="number" id="c-dorsal" min="1" /></label>
         <label>Nombre <input type="text" id="c-nombre" /></label>
         <label>UCI ID <input type="text" id="c-uciid" placeholder="Opcional" /></label>
-        <label>Categoría <input type="text" id="c-categoria" list="cats" placeholder="Elite, Máster, Sub-23..." /></label>
+        <label>Categoría
+          <select id="c-categoria"></select>
+          <input type="text" id="c-categoria-nueva" class="hidden" placeholder="Escribí la nueva categoría" />
+        </label>
         <label>Nacionalidad <input type="text" id="c-nac" placeholder="Ej: CRC" /></label>
         <label>Equipo <input type="text" id="c-equipo" /></label>
       </div>
-      <datalist id="cats"></datalist>
       <button class="btn primary" id="btn-add-corredor">Agregar corredor</button>
 
       <hr />
