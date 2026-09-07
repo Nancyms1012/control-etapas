@@ -341,21 +341,26 @@ function renderCompetencia() {
   const catsPremio = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
 
   cont.innerHTML = estado.etapas.map((e) => {
-    const metasHTML = (e.metas || []).map((m) => `
-      <tr>
-        <td><input type="text" class="comp-input" value="${escapeHtml(m.nombre)}" placeholder="Lugar (ej: Rest. California Km 25)" data-cmeta="${e.id}:${m.id}" /></td>
-        <td class="no-print"><span class="link-action" data-cmeta-del="${e.id}:${m.id}">🗑️</span></td>
-      </tr>`).join("") || `<tr><td colspan="2" class="muted">Sin metas volantes.</td></tr>`;
+    const nMetas = (e.metas || []).length;
+    const nPremios = (e.montana || []).length;
 
-    const premiosHTML = (e.montana || []).map((pm) => {
+    const metasHTML = (e.metas || []).map((m, i) => `
+      <tr>
+        <td class="col-num">${i + 1}</td>
+        <td><input type="text" class="comp-input comp-nombre" value="${escapeHtml(m.nombre)}" placeholder="Lugar (ej: Rest. California Km 25)" data-cmeta="${e.id}:${m.id}" /></td>
+        <td class="no-print"><span class="link-action" data-cmeta-del="${e.id}:${m.id}">🗑️</span></td>
+      </tr>`).join("") || `<tr><td colspan="3" class="muted">Sin metas volantes.</td></tr>`;
+
+    const premiosHTML = (e.montana || []).map((pm, i) => {
       const opsCat = catsPremio.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
       return `
       <tr>
-        <td><input type="text" class="comp-input" value="${escapeHtml(pm.nombre)}" placeholder="Lugar (ej: Bahía Carey Km 63)" data-cpm="${e.id}:${pm.id}" /></td>
+        <td class="col-num">${i + 1}</td>
+        <td><input type="text" class="comp-input comp-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Lugar (ej: Bahía Carey Km 63)" data-cpm="${e.id}:${pm.id}" /></td>
         <td><select data-cpm-cat="${e.id}:${pm.id}">${opsCat}</select></td>
         <td class="no-print"><span class="link-action" data-cpm-del="${e.id}:${pm.id}">🗑️</span></td>
       </tr>`;
-    }).join("") || `<tr><td colspan="3" class="muted">Sin premios de montaña.</td></tr>`;
+    }).join("") || `<tr><td colspan="4" class="muted">Sin premios de montaña.</td></tr>`;
 
     return `
       <div class="card comp-etapa">
@@ -371,13 +376,13 @@ function renderCompetencia() {
           </label>
           <div class="comp-listas">
             <div class="comp-sublista">
-              <h4 class="sub-h">🟢 Metas Volantes</h4>
-              <table class="tabla-pts"><tbody>${metasHTML}</tbody></table>
+              <h4 class="sub-h">🟢 Metas Volantes <span class="contador">${nMetas}</span></h4>
+              <table class="tabla-pts comp-tabla"><tbody>${metasHTML}</tbody></table>
               <button class="btn small no-print" data-add-meta="${e.id}">+ meta volante</button>
             </div>
             <div class="comp-sublista">
-              <h4 class="sub-h">🔴 Premios de Montaña</h4>
-              <table class="tabla-pts"><tbody>${premiosHTML}</tbody></table>
+              <h4 class="sub-h">🔴 Premios de Montaña <span class="contador">${nPremios}</span></h4>
+              <table class="tabla-pts comp-tabla"><tbody>${premiosHTML}</tbody></table>
               <button class="btn small no-print" data-add-premio="${e.id}">+ premio de montaña</button>
             </div>
           </div>
@@ -1197,7 +1202,7 @@ function renderMetasVolantes() {
 
   const posMV = Object.keys(estado.puntuacion.metasVolantes).map(Number).sort((a, b) => a - b);
 
-  cont.innerHTML = metas.map((m) => {
+  cont.innerHTML = metas.map((m, i) => {
     if (!m.ganadoresPorCat) m.ganadoresPorCat = {};
     const bloques = cats.map((cat) => {
       const gan = m.ganadoresPorCat[cat] || {};
@@ -1222,7 +1227,7 @@ function renderMetasVolantes() {
     return `
       <div class="mini-tabla">
         <div class="meta-head">
-          <h4 class="meta-titulo">🟢 ${escapeHtml(m.nombre || "Meta volante")}</h4>
+          <h4 class="meta-titulo">🟢 Meta ${i + 1}: ${escapeHtml(m.nombre || "(sin nombre)")}</h4>
         </div>
         <div class="cat-grid">${bloques}</div>
       </div>`;
@@ -1342,7 +1347,7 @@ function renderPremiosMontana() {
   }
   if (vacio) vacio.classList.add("hidden");
 
-  cont.innerHTML = premios.map((pm) => {
+  cont.innerHTML = premios.map((pm, i) => {
     if (!pm.ganadoresPorCat) pm.ganadoresPorCat = {};
     const tablaPts = estado.puntuacion.montana[pm.categoria] || {};
     const posiciones = Object.keys(tablaPts).map(Number).sort((a, b) => a - b);
@@ -1370,7 +1375,7 @@ function renderPremiosMontana() {
     return `
       <div class="mini-tabla">
         <div class="meta-head">
-          <h4 class="meta-titulo">🔴 ${escapeHtml(pm.nombre || "Premio de montaña")} <span class="badge-cat">Cat ${escapeHtml(pm.categoria)}</span></h4>
+          <h4 class="meta-titulo">🔴 Premio ${i + 1}: ${escapeHtml(pm.nombre || "(sin nombre)")} <span class="badge-cat">Cat ${escapeHtml(pm.categoria)}</span></h4>
         </div>
         <div class="cat-grid">${bloques}</div>
       </div>`;
