@@ -70,9 +70,18 @@ function migrar() {
     if (e.recorrido === undefined) e.recorrido = "";
     if (e.km === undefined) e.km = "";
     // Migración a Opción B: convertir ganadores {pos:id} en ganadoresPorCat {categoria:{pos:id}}
-    e.metas.forEach((m) => migrarGanadores(m));
-    e.montana.forEach((pm) => migrarGanadores(pm));
+    e.metas.forEach((m) => { migrarGanadores(m); if (m.cats === undefined) m.cats = null; });
+    e.montana.forEach((pm) => { migrarGanadores(pm); if (pm.cats === undefined) pm.cats = null; });
   });
+}
+
+// Categorías a las que aplica una meta/premio.
+// Si item.cats es null o vacío => aplica a TODAS las categorías de corredores existentes.
+function catsDeItem(item) {
+  const todas = categoriasCorredores();
+  if (!item.cats || !item.cats.length) return todas;
+  // solo devuelve las que aún existan entre los corredores (por si se renombró/borró alguna)
+  return item.cats.filter((c) => todas.includes(c));
 }
 
 // Convierte el formato viejo (ganadores por orden general) al nuevo (por categoría de corredor).
@@ -346,6 +355,37 @@ function resultadoDe(etapa, corredorId) {
 /* ================================================================
    DATOS DE COMPETENCIA (definir etapas + metas + premios)
    ================================================================ */
+// Casillas de categorías a las que aplica una meta/premio.
+// tipo: "mv" o "pm". item.cats null/vacío = aplica a todas (todas marcadas).
+function casillasCategorias(tipo, etapaId, item, catsCorredor) {
+  if (!catsCorredor.length) {
+    return `<div class="cats-check muted">Agregá corredores con categoría para elegir a cuáles aplica.</div>`;
+  }
+  const aplica = (!item.cats || !item.cats.length) ? catsCorredor : item.cats;
+  const casillas = catsCorredor.map((cat) => {
+    const marcada = aplica.includes(cat) ? "checked" : "";
+    return `<label class="cat-check-item">
+      <input type="checkbox" data-${tipo}-cat-aplica="${etapaId}:${item.id}:${encodeURIComponent(cat)}" ${marcada} /> ${escapeHtml(cat)}
+    </label>`;
+  }).join("");
+  return `<div class="cats-check"><span class="cats-check-label">Aplica a:</span> ${casillas}</div>`;
+}
+
+// Marca/desmarca una categoría en item.cats. Si estaba en "todas" (null), lo materializa.
+function toggleCategoriaItem(item, cat, marcar) {
+  const todas = categoriasCorredores();
+  // punto de partida: si cats es null/vacío, arranca desde "todas"
+  let lista = (!item.cats || !item.cats.length) ? todas.slice() : item.cats.slice();
+  if (marcar) {
+    if (!lista.includes(cat)) lista.push(cat);
+  } else {
+    lista = lista.filter((c) => c !== cat);
+  }
+  // si quedó igual a todas, lo dejamos como null (equivale a "todas") para simplicidad
+  const esTodas = todas.length && todas.every((c) => lista.includes(c)) && lista.length === todas.length;
+  item.cats = esTodas ? null : lista;
+}
+
 function renderCompetencia() {
   const cont = $("#competencia-lista");
   const vacia = $("#competencia-vacia");
@@ -359,28 +399,35 @@ function renderCompetencia() {
   if (vacia) vacia.classList.add("hidden");
 
   const catsPremio = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
+  const catsCorredor = categoriasCorredores();
 
   cont.innerHTML = estado.etapas.map((e) => {
     const nMetas = (e.metas || []).length;
     const nPremios = (e.montana || []).length;
 
     const metasHTML = (e.metas || []).map((m, i) => `
-      <tr>
-        <td class="col-num">${i + 1}</td>
-        <td><input type="text" class="comp-input comp-nombre" value="${escapeHtml(m.nombre)}" placeholder="Lugar (ej: Rest. California Km 25)" data-cmeta="${e.id}:${m.id}" /></td>
-        <td class="no-print"><span class="link-action" data-cmeta-del="${e.id}:${m.id}">🗑️</span></td>
-      </tr>`).join("") || `<tr><td colspan="3" class="muted">Sin metas volantes.</td></tr>`;
+      <div class="item-comp">
+        <div class="item-comp-linea">
+          <span class="col-num">${i + 1}</span>
+          <input type="text" class="comp-input comp-nombre" value="${escapeHtml(m.nombre)}" placeholder="Lugar (ej: Rest. California Km 25)" data-cmeta="${e.id}:${m.id}" />
+          <span class="link-action no-print" data-cmeta-del="${e.id}:${m.id}">🗑️</span>
+        </div>
+        ${casillasCategorias("mv", e.id, m, catsCorredor)}
+      </div>`).join("") || `<p class="muted">Sin metas volantes.</p>`;
 
     const premiosHTML = (e.montana || []).map((pm, i) => {
       const opsCat = catsPremio.map((c) => `<option value="${c}" ${c === String(pm.categoria) ? "selected" : ""}>Cat ${c}</option>`).join("");
       return `
-      <tr>
-        <td class="col-num">${i + 1}</td>
-        <td><input type="text" class="comp-input comp-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Lugar (ej: Bahía Carey Km 63)" data-cpm="${e.id}:${pm.id}" /></td>
-        <td><select data-cpm-cat="${e.id}:${pm.id}">${opsCat}</select></td>
-        <td class="no-print"><span class="link-action" data-cpm-del="${e.id}:${pm.id}">🗑️</span></td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="4" class="muted">Sin premios de montaña.</td></tr>`;
+      <div class="item-comp">
+        <div class="item-comp-linea">
+          <span class="col-num">${i + 1}</span>
+          <input type="text" class="comp-input comp-nombre" value="${escapeHtml(pm.nombre)}" placeholder="Lugar (ej: Bahía Carey Km 63)" data-cpm="${e.id}:${pm.id}" />
+          <select class="pm-cat-premio" data-cpm-cat="${e.id}:${pm.id}" title="Categoría del premio (puntos)">${opsCat}</select>
+          <span class="link-action no-print" data-cpm-del="${e.id}:${pm.id}">🗑️</span>
+        </div>
+        ${casillasCategorias("pm", e.id, pm, catsCorredor)}
+      </div>`;
+    }).join("") || `<p class="muted">Sin premios de montaña.</p>`;
 
     return `
       <div class="card comp-etapa">
@@ -397,12 +444,12 @@ function renderCompetencia() {
           <div class="comp-listas">
             <div class="comp-sublista">
               <h4 class="sub-h">🟢 Metas Volantes <span class="contador">${nMetas}</span></h4>
-              <table class="tabla-pts comp-tabla"><tbody>${metasHTML}</tbody></table>
+              ${metasHTML}
               <button class="btn small no-print" data-add-meta="${e.id}">+ meta volante</button>
             </div>
             <div class="comp-sublista">
               <h4 class="sub-h">🔴 Premios de Montaña <span class="contador">${nPremios}</span></h4>
-              <table class="tabla-pts comp-tabla"><tbody>${premiosHTML}</tbody></table>
+              ${premiosHTML}
               <button class="btn small no-print" data-add-premio="${e.id}">+ premio de montaña</button>
             </div>
           </div>
@@ -444,8 +491,16 @@ function renderCompetencia() {
     el.addEventListener("click", () => {
       const e = etapaPorId(el.dataset.addMeta); if (!e) return;
       if (!e.metas) e.metas = [];
-      e.metas.push({ id: uid(), nombre: "", ganadoresPorCat: {} });
+      e.metas.push({ id: uid(), nombre: "", cats: null, ganadoresPorCat: {} });
       guardar(); renderCompetencia(); renderMetasVolantes();
+    }));
+  cont.querySelectorAll("[data-mv-cat-aplica]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [eid, mid, catEnc] = el.dataset.mvCatAplica.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      const m = e.metas.find((x) => x.id === mid); if (!m) return;
+      toggleCategoriaItem(m, decodeURIComponent(catEnc), el.checked);
+      guardar(); renderMetasVolantes(); renderGeneralMV();
     }));
 
   // Premios
@@ -477,8 +532,16 @@ function renderCompetencia() {
       const cats = Object.keys(estado.puntuacion.montana).sort((a, b) => +a - +b);
       if (!cats.length) { alert("Primero configurá al menos una categoría de montaña en la pestaña Puntuación."); return; }
       if (!e.montana) e.montana = [];
-      e.montana.push({ id: uid(), nombre: "", categoria: cats[0], ganadoresPorCat: {} });
+      e.montana.push({ id: uid(), nombre: "", categoria: cats[0], cats: null, ganadoresPorCat: {} });
       guardar(); renderCompetencia(); renderPremiosMontana();
+    }));
+  cont.querySelectorAll("[data-pm-cat-aplica]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const [eid, pid, catEnc] = el.dataset.pmCatAplica.split(":");
+      const e = etapaPorId(eid); if (!e) return;
+      const pm = e.montana.find((x) => x.id === pid); if (!pm) return;
+      toggleCategoriaItem(pm, decodeURIComponent(catEnc), el.checked);
+      guardar(); renderPremiosMontana(); renderGeneralPM();
     }));
 
   // Eliminar etapa
@@ -1224,7 +1287,8 @@ function renderMetasVolantes() {
 
   cont.innerHTML = metas.map((m, i) => {
     if (!m.ganadoresPorCat) m.ganadoresPorCat = {};
-    const bloques = cats.map((cat) => {
+    const catsAplica = catsDeItem(m); // solo las categorías marcadas para esta meta
+    const bloques = catsAplica.map((cat) => {
       const gan = m.ganadoresPorCat[cat] || {};
       const filas = posMV.map((pos) => {
         const pts = estado.puntuacion.metasVolantes[pos];
@@ -1243,7 +1307,7 @@ function renderMetasVolantes() {
             <tbody>${filas}</tbody>
           </table>
         </div>`;
-    }).join("");
+    }).join("") || `<p class="muted">Esta meta no aplica a ninguna categoría (marcá alguna en Datos de competencia).</p>`;
     return `
       <div class="mini-tabla">
         <div class="meta-head">
@@ -1278,7 +1342,9 @@ function calcularGeneralMV() {
   estado.etapas.forEach((e) => {
     (e.metas || []).forEach((m) => {
       const porCat = m.ganadoresPorCat || {};
+      const aplica = catsDeItem(m); // solo cuentan las categorías a las que aplica la meta
       Object.keys(porCat).forEach((cat) => {
+        if (!aplica.includes(cat)) return; // ignora ganadores de categorías desmarcadas
         Object.keys(porCat[cat]).forEach((pos) => {
           const cid = porCat[cat][pos];
           if (!cid) return;
@@ -1372,7 +1438,8 @@ function renderPremiosMontana() {
     const tablaPts = estado.puntuacion.montana[pm.categoria] || {};
     const posiciones = Object.keys(tablaPts).map(Number).sort((a, b) => a - b);
 
-    const bloques = catsCorredor.map((cat) => {
+    const catsAplica = catsDeItem(pm); // solo las categorías marcadas para este premio
+    const bloques = catsAplica.map((cat) => {
       const gan = pm.ganadoresPorCat[cat] || {};
       const filas = posiciones.map((pos) => {
         const clave = `${pm.id}|${cat}|${pos}`;
@@ -1390,7 +1457,7 @@ function renderPremiosMontana() {
             <tbody>${filas}</tbody>
           </table>
         </div>`;
-    }).join("");
+    }).join("") || `<p class="muted">Este premio no aplica a ninguna categoría (marcá alguna en Datos de competencia).</p>`;
 
     return `
       <div class="mini-tabla">
@@ -1427,7 +1494,9 @@ function calcularGeneralPM() {
     (e.montana || []).forEach((pm) => {
       const tablaCat = estado.puntuacion.montana[pm.categoria] || {};
       const porCat = pm.ganadoresPorCat || {};
+      const aplica = catsDeItem(pm); // solo cuentan las categorías a las que aplica el premio
       Object.keys(porCat).forEach((cat) => {
+        if (!aplica.includes(cat)) return; // ignora ganadores de categorías desmarcadas
         Object.keys(porCat[cat]).forEach((pos) => {
           const cid = porCat[cat][pos];
           if (!cid) return;

@@ -249,6 +249,17 @@ hr { border: none; border-top: 1px solid var(--gris-borde); margin: 16px 0; }
   font-size: 0.75rem; font-weight: 700; border-radius: 10px;
   padding: 1px 9px; margin-left: 6px; vertical-align: middle;
 }
+
+/* Item de meta/premio en Datos de competencia (con casillas de categorías) */
+.item-comp { border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: #fff; }
+.item-comp-linea { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.item-comp-linea .col-num { width: auto; min-width: 20px; font-weight: 700; color: var(--muted); }
+.item-comp-linea .comp-nombre { flex: 1; min-width: 200px; }
+.pm-cat-premio { width: auto; }
+.cats-check { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
+.cats-check-label { color: var(--muted); font-weight: 600; }
+.cat-check-item { flex-direction: row; align-items: center; gap: 4px; color: var(--texto); }
+.cat-check-item input { width: auto; }
 .meta-titulo { margin: 0; font-size: 0.98rem; color: var(--azul-osc); }
 .badge-cat { font-size: 0.75rem; background: #fdeceb; color: var(--rojo); padding: 1px 7px; border-radius: 10px; margin-left: 4px; }
 .fila-marcada { animation: destello 1s ease; }

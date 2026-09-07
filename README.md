@@ -45,7 +45,10 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
     Podés **agregar** al final o **reemplazar** la lista. Hay una **plantilla descargable**.
 - **Datos de competencia:** definís de antemano cada etapa con **nombre, fecha, hora de salida,
   distancia (km) y recorrido**, y las listas de **metas volantes** (lugar) y **premios de montaña**
-  (lugar + categoría de premio). Es la hoja de ruta maestra; se puede imprimir.
+  (lugar + categoría de premio). A cada meta o premio le marcás con casillas **a qué categorías de
+  corredor aplica** (una o varias): por ejemplo, la meta 1 puede aplicar a las 4 categorías y la
+  meta 2 solo a 1 o 2. En el Registro del día solo aparecen los bloques de las categorías marcadas.
+  Es la hoja de ruta maestra; se puede imprimir.
 - **Registro del día:** elegís la etapa/día y registrás TODO lo de esa jornada en un solo lugar,
   con sub-pestañas: **⏱️ Tiempos** (con cronómetro y estado OK/DNF/DNS/DSQ), **🟢 Metas Volantes**
   y **🔴 Montaña** (los ganadores por dorsal). Las metas y premios que aparecen son los definidos
