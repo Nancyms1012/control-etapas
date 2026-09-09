@@ -53,6 +53,8 @@ en el navegador (`localStorage`) y se pueden respaldar en un archivo `.json`.
   con sub-pestañas: **⏱️ Tiempos** (con cronómetro y estado OK/DNF/DNS/DSQ), **🟢 Metas Volantes**
   y **🔴 Montaña** (los ganadores por dorsal). Las metas y premios que aparecen son los definidos
   en Datos de competencia.
+  - En **Tiempos** podés **subir un CSV** con columnas `dorsal, tiempo` (formato h:mm:ss) para cargar
+    los resultados sin digitar; actualiza los dorsales que vengan y deja el resto igual. Hay plantilla descargable.
 - **Clasificación general (acumulado):** se calcula automáticamente a partir de las etapas,
   con diferencia de tiempo respecto al líder (en modo tiempo) y filtro por categoría.
 - **Imprimir / PDF:** botones para imprimir la etapa o la general con encabezado del evento

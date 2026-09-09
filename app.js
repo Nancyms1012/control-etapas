@@ -893,6 +893,77 @@ function segundosATiempoCrono(seg) {
   return `${h}:${mm}:${ss}`;
 }
 
+/* ---------- Importar tiempos de la etapa desde CSV ---------- */
+function importarTiempos(file) {
+  const e = etapaActual();
+  if (!e) { setTiemposMsg("Primero elegí una etapa.", true); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const filas = parseCSV(reader.result);
+      if (!filas.length) { setTiemposMsg("El archivo está vacío.", true); return; }
+
+      // Detecta encabezado (dorsal/tiempo)
+      const primera = filas[0].map(normalizar);
+      const esEncabezado = primera.some((c) => ["dorsal", "tiempo", "numero", "nro", "#", "time"].includes(c));
+      let idx = { dorsal: 0, tiempo: 1 };
+      let inicio = 0;
+      if (esEncabezado) {
+        inicio = 1;
+        idx = { dorsal: -1, tiempo: -1 };
+        primera.forEach((c, i) => {
+          if (["dorsal", "numero", "nro", "#", "num"].includes(c)) idx.dorsal = i;
+          else if (["tiempo", "time", "tiempos"].includes(c)) idx.tiempo = i;
+        });
+        if (idx.dorsal === -1 || idx.tiempo === -1) idx = { dorsal: 0, tiempo: 1 };
+      }
+
+      let actualizados = 0, noEncontrados = [], invalidos = [];
+      for (let r = inicio; r < filas.length; r++) {
+        const f = filas[r];
+        const dorsal = (f[idx.dorsal] || "").trim();
+        const tiempoStr = (f[idx.tiempo] || "").trim();
+        if (!dorsal && !tiempoStr) continue;
+        const c = corredorPorDorsal(dorsal);
+        if (!c) { noEncontrados.push(dorsal); continue; }
+        if (!tiempoStr) continue; // sin tiempo: se salta (llena solo los que vienen)
+        if (tiempoASegundos(tiempoStr) == null) { invalidos.push(dorsal); continue; }
+        const res = resultadoDe(e, c.id);
+        res.tiempo = tiempoStr;
+        res.estado = "ok";
+        actualizados++;
+      }
+      guardar();
+      renderEtapa();
+
+      let msg = `✓ ${actualizados} tiempo(s) cargado(s) en ${e.nombre}.`;
+      if (noEncontrados.length) msg += ` Dorsales no encontrados: ${noEncontrados.join(", ")}.`;
+      if (invalidos.length) msg += ` Tiempos inválidos (dorsal): ${invalidos.join(", ")}.`;
+      setTiemposMsg(msg, noEncontrados.length > 0 || invalidos.length > 0);
+    } catch (err) {
+      setTiemposMsg("No se pudo leer el CSV: " + err.message, true);
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+function setTiemposMsg(txt, error) {
+  const el = $("#tiempos-msg");
+  if (!el) return;
+  el.textContent = txt;
+  el.style.color = error ? "var(--rojo)" : "var(--verde)";
+}
+
+function descargarPlantillaTiempos() {
+  const contenido = "dorsal,tiempo\n1,3:24:15\n2,3:24:18\n5,3:25:02\n";
+  const blob = new Blob(["\uFEFF" + contenido], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "plantilla-tiempos.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 /* ---------- Impresión ---------- */
 function prepararEncabezadoImpresion(subtitulo) {
   const ev = estado.evento;
@@ -1891,6 +1962,9 @@ function init() {
   });
   $("#btn-imprimir-etapa").addEventListener("click", imprimirEtapa);
   $$(".subtab-btn").forEach((b) => b.addEventListener("click", () => mostrarSubtab(b.dataset.subtab)));
+  $("#btn-importar-tiempos").addEventListener("click", () => $("#file-tiempos").click());
+  $("#btn-plantilla-tiempos").addEventListener("click", descargarPlantillaTiempos);
+  $("#file-tiempos").addEventListener("change", (ev) => { if (ev.target.files[0]) importarTiempos(ev.target.files[0]); ev.target.value = ""; });
 
   // Cronómetro
   $("#crono-start").addEventListener("click", cronoStart);

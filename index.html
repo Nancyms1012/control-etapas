@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Control de Etapas · Ciclismo</title>
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <header class="app-header no-print">
@@ -207,7 +207,14 @@
               <tbody></tbody>
             </table>
           </div>
-          <button class="btn no-print" id="btn-imprimir-etapa">🖨️ Imprimir / PDF etapa</button>
+          <div class="btn-row no-print" style="margin-top:10px">
+            <button class="btn no-print" id="btn-imprimir-etapa">🖨️ Imprimir / PDF etapa</button>
+            <button class="btn" id="btn-importar-tiempos">📥 Subir CSV de tiempos</button>
+            <button class="btn" id="btn-plantilla-tiempos">📄 Descargar plantilla</button>
+            <input type="file" id="file-tiempos" accept=".csv,text/csv" hidden />
+          </div>
+          <p class="muted no-print">El CSV lleva las columnas <code>dorsal, tiempo</code> (formato h:mm:ss). Actualiza los tiempos de los dorsales que vengan y deja el resto igual.</p>
+          <div id="tiempos-msg" class="muted no-print"></div>
         </div>
 
         <!-- SUB: Metas Volantes (registro de ganadores) -->
@@ -397,6 +404,6 @@
     <span id="save-status">Guardado automático activo</span>
   </footer>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
